@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTEL Sampling — Controlling Volume Without Losing Signal</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header { border-left: 3px solid var(--purple); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--purple); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── HEAD VS TAIL COMPARE ── */
+  .ht-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+  .ht-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .ht-card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .ht-card.head .ht-card-header { background: #0c1f35; }
+  .ht-card.tail .ht-card-header { background: #1e0c40; }
+  .ht-badge { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 600; }
+  .head .ht-badge { background: #0c2340; color: var(--accent); }
+  .tail .ht-badge { background: #280c40; color: var(--purple); }
+  .ht-card-body { padding: 20px; }
+  .ht-card-body p { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+
+  /* flow diagram inside cards */
+  .flow-steps { display: flex; flex-direction: column; gap: 0; margin: 14px 0; }
+  .flow-step { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .flow-step:last-child { border-bottom: none; }
+  .flow-num { font-family: var(--mono); font-size: 10px; width: 20px; flex-shrink: 0; color: var(--muted); margin-top: 1px; }
+  .flow-text { font-size: 12px; color: var(--text); }
+  .flow-text .sub { color: var(--muted); font-size: 11px; }
+
+  .pro-con { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .pros, .cons { font-size: 11px; padding: 10px 12px; border-radius: 4px; }
+  .pros { background: #0c1f10; border: 1px solid #1a4025; }
+  .cons { background: #1f0c0c; border: 1px solid #4a1a1a; }
+  .pros .label { color: var(--green); font-family: var(--mono); font-size: 10px; margin-bottom: 5px; font-weight: 600; }
+  .cons .label { color: var(--red); font-family: var(--mono); font-size: 10px; margin-bottom: 5px; font-weight: 600; }
+  .pros li, .cons li { color: var(--muted); margin-left: 12px; margin-bottom: 3px; }
+
+  /* ── DECISION POINT ── */
+  .decision-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--orange);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .decision-banner h4 { font-family: var(--mono); font-size: 12px; color: var(--orange); margin-bottom: 8px; }
+  .decision-banner p { font-size: 12px; color: var(--muted); }
+
+  /* ── TAIL SAMPLING POLICIES ── */
+  .policies-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 40px; }
+  .policy-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .policy-card-header { padding: 10px 14px; background: #1e0c40; border-bottom: 1px solid var(--border); }
+  .policy-card-header .name { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--purple); }
+  .policy-card-header .type { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .policy-card-body { padding: 14px; }
+  .policy-card-body p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; font-family: var(--mono); font-size: 10px; line-height: 1.7; overflow-x: auto; }
+  .y-key { color: var(--accent); }
+  .y-val { color: var(--green); }
+  .y-str { color: var(--yellow); }
+  .y-comment { color: #334155; }
+  .y-section { color: var(--orange); font-weight: 600; }
+  .y-warn { color: var(--red); }
+
+  /* ── VOLUME VISUALISER ── */
+  .volume-vis { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 40px; }
+  .vol-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  .vol-label { font-family: var(--mono); font-size: 11px; width: 160px; flex-shrink: 0; color: var(--text); }
+  .vol-label .sub { color: var(--muted); font-size: 10px; display: block; }
+  .vol-track { flex: 1; height: 28px; background: var(--surface2); border-radius: 3px; position: relative; overflow: hidden; }
+  .vol-bar { height: 100%; border-radius: 3px; display: flex; align-items: center; padding: 0 10px; font-family: var(--mono); font-size: 10px; color: #fff; transition: width 0.6s ease; }
+  .vol-count { font-family: var(--mono); font-size: 11px; width: 100px; flex-shrink: 0; text-align: right; }
+
+  /* ── COMBINED POLICY CONFIG ── */
+  .full-config { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 40px; }
+  .full-config pre { font-size: 11px; }
+
+  /* ── PITFALLS ── */
+  .pitfalls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 40px; }
+  .pitfall-card { background: var(--surface); border: 1px solid #3d1a1a; border-radius: 6px; padding: 16px; }
+  .pitfall-card .num { font-family: var(--mono); font-size: 22px; font-weight: 600; color: #3d1a1a; margin-bottom: 6px; }
+  .pitfall-card h4 { font-size: 13px; font-weight: 600; color: var(--red); margin-bottom: 6px; }
+  .pitfall-card p { font-size: 12px; color: var(--muted); }
+  .pitfall-card .fix { margin-top: 8px; font-size: 11px; color: var(--green); font-family: var(--mono); }
+
+  .note { background: #0c1f10; border: 1px solid #1a4025; border-radius: 6px; padding: 16px 20px; font-size: 12px; color: #86efac; font-family: var(--mono); }
+  .note strong { color: var(--green); }
+
+  @media (max-width: 700px) {
+    .ht-grid, .pro-con, .policies-grid, .pitfalls { grid-template-columns: 1fr; }
+    .decision-banner { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// 04 — Sampling</div>
+  <h1>Sampling<br>— control volume without losing signal</h1>
+  <p>At low traffic, record everything. As volume grows, storing every trace becomes expensive fast. Sampling is how you stay within budget while guaranteeing you never miss an error or a slow request.</p>
+</header>
+
+<!-- THE PROBLEM -->
+<div class="section-label">The Volume Problem</div>
+<div class="volume-vis">
+  <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">A single service at modest scale generates significant trace volume. At distributed system scale, naive 100% sampling is unworkable.</p>
+
+  <div class="vol-row">
+    <div class="vol-label">100 req/s<span class="sub">small app</span></div>
+    <div class="vol-track"><div class="vol-bar" style="width:8%;background:#1a3a6e;">100/s</div></div>
+    <div class="vol-count" style="color:var(--green)">~8.6M/day</div>
+  </div>
+  <div class="vol-row">
+    <div class="vol-label">1,000 req/s<span class="sub">growing service</span></div>
+    <div class="vol-track"><div class="vol-bar" style="width:30%;background:#2a3a6e;">1K/s</div></div>
+    <div class="vol-count" style="color:var(--orange)">~86M/day</div>
+  </div>
+  <div class="vol-row">
+    <div class="vol-label">10,000 req/s<span class="sub">platform scale</span></div>
+    <div class="vol-track"><div class="vol-bar" style="width:75%;background:#3a2a5e;">10K/s</div></div>
+    <div class="vol-count" style="color:var(--red)">~864M/day</div>
+  </div>
+  <div class="vol-row">
+    <div class="vol-label">10% sampling<span class="sub">tail-based</span></div>
+    <div class="vol-track"><div class="vol-bar" style="width:7.5%;background:#1a4030;">1K/s sampled</div></div>
+    <div class="vol-count" style="color:var(--green)">~86M/day ✓</div>
+  </div>
+
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);">
+    <strong style="color:var(--text)">The goal:</strong> keep 100% of interesting traces (errors, slow requests, specific users) and drop a configurable percentage of healthy, fast, routine traffic — which tells you nothing new.
+  </div>
+</div>
+
+<!-- HEAD VS TAIL -->
+<div class="section-label">Two Approaches — Head vs. Tail Sampling</div>
+<div class="ht-grid">
+  <div class="ht-card head">
+    <div class="ht-card-header">
+      <span class="ht-badge">HEAD-BASED</span>
+      <strong style="font-size:13px;">Decide at request start</strong>
+    </div>
+    <div class="ht-card-body">
+      <p>The SDK flips a coin when a new trace starts. If it decides to sample, all spans in that trace are recorded. If not, none are. The decision is locked in before anything happens.</p>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="flow-num">1</span><div class="flow-text">Request arrives at the root service<span class="sub">SDK generates a trace_id</span></div></div>
+        <div class="flow-step"><span class="flow-num">2</span><div class="flow-text">SDK makes a random sampling decision<span class="sub">e.g. keep 10% of all requests</span></div></div>
+        <div class="flow-step"><span class="flow-num">3</span><div class="flow-text">Decision is encoded in the trace context<span class="sub">Propagated to all downstream services</span></div></div>
+        <div class="flow-step"><span class="flow-num">4</span><div class="flow-text">All services honour the same decision<span class="sub">Either the whole trace is kept, or none of it</span></div></div>
+      </div>
+      <div class="pro-con">
+        <div class="pros"><div class="label">PROS</div><ul><li>Zero latency overhead</li><li>Simple to configure</li><li>Stateless — no buffering</li><li>Works in the SDK, no Collector needed</li></ul></div>
+        <div class="cons"><div class="label">CONS</div><ul><li>Blind to outcomes</li><li>May drop error traces</li><li>No guarantee of capturing slow requests</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ht-card tail">
+    <div class="ht-card-header">
+      <span class="ht-badge">TAIL-BASED</span>
+      <strong style="font-size:13px;">Decide after trace completes</strong>
+    </div>
+    <div class="ht-card-body">
+      <p>The Collector buffers all spans for a trace until the trace is complete (or a timeout expires). It then applies policy rules to decide whether to keep or drop the entire trace.</p>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="flow-num">1</span><div class="flow-text">All spans arrive at the gateway Collector<span class="sub">Buffered in memory by trace_id</span></div></div>
+        <div class="flow-step"><span class="flow-num">2</span><div class="flow-text">Collector waits for trace to complete<span class="sub">Or until decision_wait timeout expires</span></div></div>
+        <div class="flow-step"><span class="flow-num">3</span><div class="flow-text">Policies evaluate the completed trace<span class="sub">Status, latency, attributes</span></div></div>
+        <div class="flow-step"><span class="flow-num">4</span><div class="flow-text">Keep or drop decision applied to all spans<span class="sub">Entire trace kept or entirely dropped</span></div></div>
+      </div>
+      <div class="pro-con">
+        <div class="pros"><div class="label">PROS</div><ul><li>Always captures errors</li><li>Captures slow requests</li><li>Rich, rule-based policies</li><li>Can target specific services/users</li></ul></div>
+        <div class="cons"><div class="label">CONS</div><ul><li>Requires stateful Collector</li><li>Memory intensive</li><li>Spans for a trace must hit same Collector instance</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- WHEN TO USE WHICH -->
+<div class="decision-banner">
+  <div>
+    <h4>Use head-based when…</h4>
+    <p>Traffic is low to medium (&lt;1K req/s), you want simplicity with no Collector dependency, or you're just getting started and want working traces quickly. Also appropriate when your error rate is so low that missing a few errors is acceptable.</p>
+  </div>
+  <div>
+    <h4>Use tail-based when…</h4>
+    <p>Traffic is high and storage cost matters, you need guaranteed capture of all errors and slow requests, or you need to target specific user segments or services for full trace capture. Requires the two-tier Collector topology from Section 03.</p>
+  </div>
+</div>
+
+<!-- POLICY TYPES -->
+<div class="section-label">Tail Sampling — Policy Types</div>
+<div class="policies-grid">
+  <div class="policy-card">
+    <div class="policy-card-header">
+      <div class="name">status_code</div>
+      <div class="type">type: status_code</div>
+    </div>
+    <div class="policy-card-body">
+      <p>Keep all traces where any span has an error status. This is the most important policy — never drop a broken request.</p>
+      <pre><span class="y-key">- name:</span> <span class="y-str">always-errors</span>
+  <span class="y-key">type:</span> <span class="y-val">status_code</span>
+  <span class="y-key">status_code:</span>
+    <span class="y-key">status_codes:</span>
+      <span class="y-str">- ERROR</span></pre>
+    </div>
+  </div>
+
+  <div class="policy-card">
+    <div class="policy-card-header">
+      <div class="name">latency</div>
+      <div class="type">type: latency</div>
+    </div>
+    <div class="policy-card-body">
+      <p>Keep all traces where the root span exceeded a latency threshold. Captures slowness even when no error was returned.</p>
+      <pre><span class="y-key">- name:</span> <span class="y-str">slow-requests</span>
+  <span class="y-key">type:</span> <span class="y-val">latency</span>
+  <span class="y-key">latency:</span>
+    <span class="y-key">threshold_ms:</span> <span class="y-val">1000</span>
+    <span class="y-comment"># keep anything over 1s</span></pre>
+    </div>
+  </div>
+
+  <div class="policy-card">
+    <div class="policy-card-header">
+      <div class="name">probabilistic</div>
+      <div class="type">type: probabilistic</div>
+    </div>
+    <div class="policy-card-body">
+      <p>Random percentage of healthy traces. Provides a baseline sample of normal traffic for trend analysis and capacity planning.</p>
+      <pre><span class="y-key">- name:</span> <span class="y-str">baseline-sample</span>
+  <span class="y-key">type:</span> <span class="y-val">probabilistic</span>
+  <span class="y-key">probabilistic:</span>
+    <span class="y-key">sampling_percentage:</span> <span class="y-val">5</span>
+    <span class="y-comment"># keep 5% of healthy traces</span></pre>
+    </div>
+  </div>
+
+  <div class="policy-card">
+    <div class="policy-card-header">
+      <div class="name">string_attribute</div>
+      <div class="type">type: string_attribute</div>
+    </div>
+    <div class="policy-card-body">
+      <p>Keep traces matching a specific attribute value. Useful for always capturing traces from specific users, tenants, or services.</p>
+      <pre><span class="y-key">- name:</span> <span class="y-str">vip-tenants</span>
+  <span class="y-key">type:</span> <span class="y-val">string_attribute</span>
+  <span class="y-key">string_attribute:</span>
+    <span class="y-key">key:</span> <span class="y-str">tenant.tier</span>
+    <span class="y-key">values:</span>
+      <span class="y-str">- enterprise</span>
+      <span class="y-str">- vip</span></pre>
+    </div>
+  </div>
+
+  <div class="policy-card">
+    <div class="policy-card-header">
+      <div class="name">rate_limiting</div>
+      <div class="type">type: rate_limiting</div>
+    </div>
+    <div class="policy-card-body">
+      <p>Cap the number of traces per second flowing through regardless of other policies. Acts as a hard spending limit on your backend.</p>
+      <pre><span class="y-key">- name:</span> <span class="y-str">hard-cap</span>
+  <span class="y-key">type:</span> <span class="y-val">rate_limiting</span>
+  <span class="y-key">rate_limiting:</span>
+    <span class="y-key">spans_per_second:</span> <span class="y-val">500</span>
+    <span class="y-comment"># absolute ceiling</span></pre>
+    </div>
+  </div>
+
+  <div class="policy-card">
+    <div class="policy-card-header">
+      <div class="name">composite</div>
+      <div class="type">type: composite</div>
+    </div>
+    <div class="policy-card-body">
+      <p>Combines multiple policies with rate allocation per policy. Lets you say "keep 200 errors/s AND 100 slow traces/s AND 200 random traces/s".</p>
+      <pre><span class="y-key">- name:</span> <span class="y-str">combined</span>
+  <span class="y-key">type:</span> <span class="y-val">composite</span>
+  <span class="y-key">composite:</span>
+    <span class="y-key">max_total_spans_per_second:</span> <span class="y-val">500</span>
+    <span class="y-key">policy_order:</span>
+      <span class="y-str">- always-errors</span>
+      <span class="y-str">- slow-requests</span>
+      <span class="y-str">- baseline-sample</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- FULL PRODUCTION CONFIG -->
+<div class="section-label">Production-Ready Tail Sampling Config</div>
+<div class="full-config">
+  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">A complete, layered policy set for a high-volume service. Policies are evaluated in order — first match wins. Errors and slow requests are always kept regardless of volume.</p>
+<pre><span class="y-key">tail_sampling:</span>
+  <span class="y-key">decision_wait:</span>      <span class="y-val">10s</span>     <span class="y-comment"># wait this long for all spans to arrive</span>
+  <span class="y-key">num_traces:</span>         <span class="y-val">50000</span>   <span class="y-comment"># max traces buffered in memory at once</span>
+  <span class="y-key">expected_new_traces_per_sec:</span> <span class="y-val">1000</span>
+
+  <span class="y-key">policies:</span>
+
+    <span class="y-comment">## ── LAYER 1: Always keep — no exceptions ──────────────────</span>
+    <span class="y-key">- name:</span> <span class="y-str">errors-always</span>
+      <span class="y-key">type:</span> <span class="y-val">status_code</span>
+      <span class="y-key">status_code:</span> <span class="y-val">{status_codes: [ERROR]}</span>
+
+    <span class="y-key">- name:</span> <span class="y-str">slow-always</span>          <span class="y-comment"># slow traces regardless of status</span>
+      <span class="y-key">type:</span> <span class="y-val">latency</span>
+      <span class="y-key">latency:</span> <span class="y-val">{threshold_ms: 2000}</span>
+
+    <span class="y-comment">## ── LAYER 2: Business-critical paths ──────────────────────</span>
+    <span class="y-key">- name:</span> <span class="y-str">checkout-always</span>      <span class="y-comment"># keep all checkout/payment traces</span>
+      <span class="y-key">type:</span> <span class="y-val">string_attribute</span>
+      <span class="y-key">string_attribute:</span>
+        <span class="y-key">key:</span>    <span class="y-str">http.route</span>
+        <span class="y-key">values:</span> <span class="y-str">["/checkout", "/payment", "/order"]</span>
+
+    <span class="y-key">- name:</span> <span class="y-str">enterprise-always</span>   <span class="y-comment"># keep all enterprise tenant traces</span>
+      <span class="y-key">type:</span> <span class="y-val">string_attribute</span>
+      <span class="y-key">string_attribute:</span>
+        <span class="y-key">key:</span>    <span class="y-str">tenant.tier</span>
+        <span class="y-key">values:</span> <span class="y-str">[enterprise]</span>
+
+    <span class="y-comment">## ── LAYER 3: Baseline sample of healthy traffic ────────────</span>
+    <span class="y-key">- name:</span> <span class="y-str">healthy-sample</span>
+      <span class="y-key">type:</span> <span class="y-val">probabilistic</span>
+      <span class="y-key">probabilistic:</span> <span class="y-val">{sampling_percentage: 5}</span>
+
+    <span class="y-comment">## ── LAYER 4: Hard cap — spending protection ────────────────</span>
+    <span class="y-key">- name:</span> <span class="y-str">rate-limiter</span>
+      <span class="y-key">type:</span> <span class="y-val">rate_limiting</span>
+      <span class="y-key">rate_limiting:</span> <span class="y-val">{spans_per_second: 1000}</span></pre>
+</div>
+
+<!-- PITFALLS -->
+<div class="section-label">Common Pitfalls</div>
+<div class="pitfalls">
+  <div class="pitfall-card">
+    <div class="num">01</div>
+    <h4>Spans split across Collector instances</h4>
+    <p>Tail sampling is stateful. If spans from the same trace hit different gateway replicas, the policy sees an incomplete trace and makes a wrong decision.</p>
+    <div class="fix">→ Use trace_id-based consistent hashing on your load balancer</div>
+  </div>
+  <div class="pitfall-card">
+    <div class="num">02</div>
+    <h4>decision_wait too short</h4>
+    <p>If your longest operation (e.g. a batch job) takes 30s but decision_wait is 10s, the Collector decides before all spans have arrived — and may drop spans it should keep.</p>
+    <div class="fix">→ Set decision_wait to 2× your p99 trace duration</div>
+  </div>
+  <div class="pitfall-card">
+    <div class="num">03</div>
+    <h4>Sampling metrics alongside traces</h4>
+    <p>Sampling only applies to traces. Never apply probabilistic sampling to metrics — you will corrupt your aggregates and break alerting.</p>
+    <div class="fix">→ Metrics pipeline must always use 100% — no sampling processor</div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Where to go next →</strong>  05 — Distributed tracing &amp; context propagation
+</div>
+
+</body>
+</html>

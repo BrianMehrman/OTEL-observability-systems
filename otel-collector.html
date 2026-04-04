@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTEL Collector — Pipeline Deep Dive</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  header {
+    border-left: 3px solid var(--orange);
+    padding-left: 20px;
+    margin-bottom: 48px;
+  }
+  header .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--orange);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── PIPELINE VISUAL ── */
+  .pipeline-visual {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px;
+    margin-bottom: 40px;
+  }
+  .pipeline-stages {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr 40px 1fr;
+    gap: 0;
+    align-items: stretch;
+    margin-bottom: 20px;
+  }
+  .stage {
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .stage-header {
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+  }
+  .stage-header.recv  { background: #0c1f35; color: var(--accent); }
+  .stage-header.proc  { background: #1f1a08; color: var(--orange); }
+  .stage-header.expo  { background: #150d2a; color: var(--purple); }
+
+  .stage-body { padding: 12px; background: var(--surface2); }
+  .component-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: default;
+    transition: background 0.15s;
+  }
+  .component-pill:last-child { margin-bottom: 0; }
+
+  .recv .component-pill  { border-color: #1a3a5c; color: #93c5fd; background: #0c1f35; }
+  .proc .component-pill  { border-color: #3d3210; color: #fcd34d; background: #1f1a08; }
+  .expo .component-pill  { border-color: #3d1d7a; color: #c4b5fd; background: #1e0c40; }
+
+  .recv .component-pill:hover  { background: #142d4e; }
+  .proc .component-pill:hover  { background: #302810; }
+  .expo .component-pill:hover  { background: #2a1255; }
+
+  .pill-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .recv .pill-dot { background: var(--accent); }
+  .proc .pill-dot { background: var(--orange); }
+  .expo .pill-dot { background: var(--purple); }
+
+  .pill-badge {
+    margin-left: auto;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+  .badge-req { background: #2d1f08; color: var(--orange); border: 1px solid #3d2a0a; }
+  .badge-rec { background: #0c2310; color: var(--green); border: 1px solid #1a4020; }
+
+  .stage-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 18px;
+  }
+
+  /* signals flow indicator */
+  .signal-flow {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .signal-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid;
+  }
+  .sc-t { border-color: #1a3a5c; color: #93c5fd; background: #0c1524; }
+  .sc-m { border-color: #1a4530; color: #6ee7b7; background: #0c1f14; }
+  .sc-l { border-color: #3d3210; color: #fcd34d; background: #1a1506; }
+
+  /* ── YAML VIEWER ── */
+  .yaml-tabs { margin-bottom: 40px; }
+  .yaml-tab-nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .yaml-tab-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 8px 20px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    color: var(--muted);
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+    border-radius: 4px 4px 0 0;
+  }
+  .yaml-tab-btn.active {
+    color: var(--orange);
+    border-color: var(--border);
+    background: var(--surface);
+    border-bottom-color: var(--surface);
+  }
+  .yaml-panel {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+  }
+  .yaml-panel.active { display: block; }
+  .yaml-panel-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .yaml-panel-header strong { color: var(--text); }
+  .yaml-body { padding: 20px; }
+
+  /* code block */
+  pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .y-comment { color: #334155; }
+  .y-key     { color: var(--accent); }
+  .y-val     { color: var(--green); }
+  .y-str     { color: #fcd34d; }
+  .y-section { color: var(--orange); font-weight: 600; }
+  .y-warn    { color: var(--red); }
+  .y-good    { color: var(--green); }
+
+  .callout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .callout {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 14px;
+    font-size: 12px;
+  }
+  .callout h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .callout p { color: var(--muted); }
+  .callout.warn { border-color: #3d2410; }
+  .callout.warn h4 { color: var(--orange); }
+  .callout.good { border-color: #1a4025; }
+  .callout.good h4 { color: var(--green); }
+  .callout.info { border-color: #1a3a5c; }
+  .callout.info h4 { color: var(--accent); }
+  .callout.note { border-color: #3d1d7a; }
+  .callout.note h4 { color: var(--purple); }
+
+  /* ── SCALE COMPARE ── */
+  .scale-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+  .scale-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .scale-card-header {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .scale-card.small .scale-card-header { background: #0d1a2a; }
+  .scale-card.large .scale-card-header { background: #150d2a; }
+  .scale-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .small .scale-badge { background: #0c2340; color: var(--accent); }
+  .large .scale-badge { background: #1e0c40; color: var(--purple); }
+  .scale-card-body { padding: 18px; }
+
+  /* topology diagram */
+  .topology {
+    font-family: var(--mono);
+    font-size: 11px;
+    margin: 12px 0;
+  }
+  .topo-node {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid;
+    font-size: 10px;
+    margin: 2px;
+  }
+  .topo-app   { border-color: #1a3a5c; color: #93c5fd; background: #0c1f35; }
+  .topo-agent { border-color: #3d3210; color: #fcd34d; background: #1f1a08; }
+  .topo-gate  { border-color: #3d1d7a; color: #c4b5fd; background: #1e0c40; }
+  .topo-back  { border-color: #1a4530; color: #6ee7b7; background: #0d2318; }
+  .topo-arrow { color: var(--muted); margin: 0 4px; }
+
+  /* ── PROCESSOR DEEP DIVE ── */
+  .processor-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-bottom: 40px;
+  }
+  .proc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .proc-card-header {
+    padding: 10px 16px;
+    background: #1f1a08;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .proc-card-header .name { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--yellow); }
+  .proc-card-header .req-tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+  .proc-card-body { padding: 14px 16px; }
+  .proc-card-body p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .proc-card-body pre { font-size: 10px; padding: 10px 12px; }
+
+  /* ── MEMORY LIMITER VISUAL ── */
+  .mem-visual {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 60px;
+    margin: 10px 0;
+    position: relative;
+  }
+  .mem-bar {
+    flex: 1;
+    border-radius: 2px 2px 0 0;
+    position: relative;
+  }
+  .mem-line {
+    position: absolute;
+    left: 0; right: 0;
+    border-top: 1px dashed;
+    font-family: var(--mono);
+    font-size: 9px;
+  }
+
+  .note {
+    background: #0c1f10;
+    border: 1px solid #1a4025;
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-size: 12px;
+    color: #86efac;
+    font-family: var(--mono);
+    margin-top: 40px;
+  }
+  .note strong { color: var(--green); }
+
+  @media (max-width: 700px) {
+    .pipeline-stages { grid-template-columns: 1fr; }
+    .stage-arrow { transform: rotate(90deg); }
+    .scale-compare, .callout-grid, .processor-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// 03 — The Collector</div>
+  <h1>The OTEL Collector<br>— pipeline, config &amp; scale</h1>
+  <p>The Collector is the operational core of any OTEL setup. It sits between your application and your backend, and it's where routing, filtering, sampling, and enrichment all happen. Get this right and everything else becomes easier.</p>
+</header>
+
+<!-- PIPELINE OVERVIEW -->
+<div class="section-label">The Three-Stage Pipeline</div>
+<div class="pipeline-visual">
+  <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Every signal — traces, metrics, logs — flows through the same three stages. A Collector can run multiple independent pipelines simultaneously, one per signal type.</p>
+
+  <div class="pipeline-stages">
+    <!-- RECEIVERS -->
+    <div class="stage recv">
+      <div class="stage-header recv">① Receivers</div>
+      <div class="stage-body recv">
+        <div class="component-pill"><span class="pill-dot"></span>otlp/grpc<span class="pill-badge badge-rec">common</span></div>
+        <div class="component-pill"><span class="pill-dot"></span>otlp/http<span class="pill-badge badge-rec">common</span></div>
+        <div class="component-pill"><span class="pill-dot"></span>prometheus</div>
+        <div class="component-pill"><span class="pill-dot"></span>jaeger</div>
+        <div class="component-pill"><span class="pill-dot"></span>zipkin</div>
+        <div class="component-pill"><span class="pill-dot"></span>hostmetrics</div>
+        <div class="component-pill"><span class="pill-dot"></span>k8s_events</div>
+        <div class="component-pill"><span class="pill-dot"></span>filelog</div>
+      </div>
+    </div>
+    <div class="stage-arrow">→</div>
+    <!-- PROCESSORS -->
+    <div class="stage proc">
+      <div class="stage-header proc">② Processors</div>
+      <div class="stage-body proc">
+        <div class="component-pill"><span class="pill-dot"></span>memory_limiter<span class="pill-badge badge-req">required</span></div>
+        <div class="component-pill"><span class="pill-dot"></span>batch<span class="pill-badge badge-req">required</span></div>
+        <div class="component-pill"><span class="pill-dot"></span>resourcedetection<span class="pill-badge badge-rec">common</span></div>
+        <div class="component-pill"><span class="pill-dot"></span>attributes</div>
+        <div class="component-pill"><span class="pill-dot"></span>filter</div>
+        <div class="component-pill"><span class="pill-dot"></span>transform</div>
+        <div class="component-pill"><span class="pill-dot"></span>tail_sampling</div>
+        <div class="component-pill"><span class="pill-dot"></span>k8sattributes</div>
+      </div>
+    </div>
+    <div class="stage-arrow">→</div>
+    <!-- EXPORTERS -->
+    <div class="stage expo">
+      <div class="stage-header expo">③ Exporters</div>
+      <div class="stage-body expo">
+        <div class="component-pill"><span class="pill-dot"></span>otlp (to backend)<span class="pill-badge badge-rec">common</span></div>
+        <div class="component-pill"><span class="pill-dot"></span>prometheusremotewrite</div>
+        <div class="component-pill"><span class="pill-dot"></span>jaeger</div>
+        <div class="component-pill"><span class="pill-dot"></span>datadog</div>
+        <div class="component-pill"><span class="pill-dot"></span>googlecloud</div>
+        <div class="component-pill"><span class="pill-dot"></span>kafka</div>
+        <div class="component-pill"><span class="pill-dot"></span>logging (debug)</div>
+        <div class="component-pill"><span class="pill-dot"></span>file</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="signal-flow">
+    <span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:4px;">Flows through pipeline:</span>
+    <span class="signal-chip sc-t">traces</span>
+    <span class="signal-chip sc-m">metrics</span>
+    <span class="signal-chip sc-l">logs</span>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:12px;">Each signal type can have its own pipeline with different processors and exporters</span>
+  </div>
+</div>
+
+<!-- YAML CONFIGS -->
+<div class="section-label">Configuration Walkthroughs</div>
+<div class="yaml-tabs">
+  <div class="yaml-tab-nav">
+    <button class="yaml-tab-btn active" onclick="showYaml('simple', this)">Simple (small app)</button>
+    <button class="yaml-tab-btn" onclick="showYaml('agent', this)">Agent (per node)</button>
+    <button class="yaml-tab-btn" onclick="showYaml('gateway', this)">Gateway (centralised)</button>
+  </div>
+
+  <!-- SIMPLE CONFIG -->
+  <div id="yaml-simple" class="yaml-panel active">
+    <div class="yaml-panel-header">
+      <strong>Minimal production-ready config</strong>
+      <span>— single service, one backend, straightforward setup</span>
+    </div>
+    <div class="yaml-body">
+<pre><span class="y-comment"># collector-config.yaml — simple setup</span>
+
+<span class="y-section">receivers:</span>
+  <span class="y-key">otlp:</span>
+    <span class="y-key">protocols:</span>
+      <span class="y-key">grpc:</span>
+        <span class="y-key">endpoint:</span> <span class="y-str">0.0.0.0:4317</span>   <span class="y-comment"># your app sends here</span>
+      <span class="y-key">http:</span>
+        <span class="y-key">endpoint:</span> <span class="y-str">0.0.0.0:4318</span>   <span class="y-comment"># or here (HTTP)</span>
+
+<span class="y-section">processors:</span>
+  <span class="y-key">memory_limiter:</span>                       <span class="y-warn"># ← always first</span>
+    <span class="y-key">check_interval:</span> <span class="y-val">1s</span>
+    <span class="y-key">limit_mib:</span> <span class="y-val">400</span>                     <span class="y-comment"># hard memory ceiling</span>
+    <span class="y-key">spike_limit_mib:</span> <span class="y-val">100</span>               <span class="y-comment"># headroom for spikes</span>
+
+  <span class="y-key">batch:</span>                                <span class="y-warn"># ← always last processor</span>
+    <span class="y-key">send_batch_size:</span> <span class="y-val">1000</span>             <span class="y-comment"># send after N items</span>
+    <span class="y-key">timeout:</span> <span class="y-val">5s</span>                       <span class="y-comment"># or after 5s, whichever first</span>
+
+  <span class="y-key">resourcedetection:</span>                    <span class="y-comment"># auto-detect host/cloud metadata</span>
+    <span class="y-key">detectors:</span> <span class="y-str">[env, system, docker]</span>
+
+<span class="y-section">exporters:</span>
+  <span class="y-key">otlp:</span>
+    <span class="y-key">endpoint:</span> <span class="y-str">https://your-backend:4317</span>
+    <span class="y-key">headers:</span>
+      <span class="y-key">Authorization:</span> <span class="y-str">"Bearer ${env:BACKEND_API_KEY}"</span>
+
+  <span class="y-key">logging:</span>                              <span class="y-comment"># useful during development</span>
+    <span class="y-key">verbosity:</span> <span class="y-val">detailed</span>
+
+<span class="y-section">service:</span>
+  <span class="y-key">pipelines:</span>
+    <span class="y-key">traces:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, resourcedetection, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[otlp]</span>
+    <span class="y-key">metrics:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, resourcedetection, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[otlp]</span>
+    <span class="y-key">logs:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, resourcedetection, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[otlp]</span></pre>
+
+      <div class="callout-grid">
+        <div class="callout warn">
+          <h4>⚠ memory_limiter must be first</h4>
+          <p>Processors run in the order listed. <code>memory_limiter</code> must come before anything else so it can drop data before it fills your heap during a traffic spike.</p>
+        </div>
+        <div class="callout warn">
+          <h4>⚠ batch must be last</h4>
+          <p><code>batch</code> groups items before sending to the exporter. Placing it last ensures all processing is done before grouping. Reversing this order wastes work.</p>
+        </div>
+        <div class="callout good">
+          <h4>✓ resourcedetection</h4>
+          <p>Auto-attaches host name, OS, cloud provider, and region to every span and metric. Free signal that makes filtering in your backend much easier.</p>
+        </div>
+        <div class="callout info">
+          <h4>Three separate pipelines</h4>
+          <p>Traces, metrics, and logs are declared as independent pipelines. They share processors here, but you can give each one different rules as needs grow.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGENT CONFIG -->
+  <div id="yaml-agent" class="yaml-panel">
+    <div class="yaml-panel-header">
+      <strong>Agent config (per node / DaemonSet)</strong>
+      <span>— lightweight, close to the app, minimal processing</span>
+    </div>
+    <div class="yaml-body">
+<pre><span class="y-comment"># agent-config.yaml — runs on every node in your cluster</span>
+<span class="y-comment"># Goal: receive locally, enrich lightly, forward to gateway</span>
+
+<span class="y-section">receivers:</span>
+  <span class="y-key">otlp:</span>
+    <span class="y-key">protocols:</span>
+      <span class="y-key">grpc:</span> <span class="y-key">endpoint:</span> <span class="y-str">0.0.0.0:4317</span>
+  <span class="y-key">hostmetrics:</span>                          <span class="y-comment"># CPU, memory, disk, network</span>
+    <span class="y-key">collection_interval:</span> <span class="y-val">30s</span>
+    <span class="y-key">scrapers:</span>
+      <span class="y-key">cpu:</span>
+      <span class="y-key">memory:</span>
+      <span class="y-key">disk:</span>
+      <span class="y-key">network:</span>
+
+<span class="y-section">processors:</span>
+  <span class="y-key">memory_limiter:</span>
+    <span class="y-key">check_interval:</span> <span class="y-val">1s</span>
+    <span class="y-key">limit_mib:</span> <span class="y-val">256</span>                     <span class="y-comment"># agents stay lean</span>
+    <span class="y-key">spike_limit_mib:</span> <span class="y-val">64</span>
+
+  <span class="y-key">k8sattributes:</span>                        <span class="y-comment"># attach pod/namespace metadata</span>
+    <span class="y-key">extract:</span>
+      <span class="y-key">metadata:</span> <span class="y-str">[k8s.pod.name, k8s.namespace.name,</span>
+                <span class="y-str"> k8s.deployment.name, k8s.node.name]</span>
+    <span class="y-key">pod_association:</span>
+      <span class="y-key">- sources:</span>
+        <span class="y-key">  - from:</span> <span class="y-val">resource_attribute</span>
+          <span class="y-key">  name:</span> <span class="y-str">k8s.pod.ip</span>
+
+  <span class="y-key">resourcedetection:</span>
+    <span class="y-key">detectors:</span> <span class="y-str">[env, k8snode, system]</span>
+
+  <span class="y-key">batch:</span>
+    <span class="y-key">send_batch_size:</span> <span class="y-val">500</span>
+    <span class="y-key">timeout:</span> <span class="y-val">2s</span>                        <span class="y-comment"># lower latency than gateway</span>
+
+<span class="y-section">exporters:</span>
+  <span class="y-key">otlp:</span>                                 <span class="y-comment"># forward to gateway collectors</span>
+    <span class="y-key">endpoint:</span> <span class="y-str">gateway-collector:4317</span>
+    <span class="y-key">tls:</span>
+      <span class="y-key">insecure:</span> <span class="y-val">false</span>
+
+<span class="y-section">service:</span>
+  <span class="y-key">pipelines:</span>
+    <span class="y-key">traces:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, k8sattributes, resourcedetection, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[otlp]</span>
+    <span class="y-key">metrics:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp, hostmetrics]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, k8sattributes, resourcedetection, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[otlp]</span></pre>
+
+      <div class="callout-grid">
+        <div class="callout info">
+          <h4>Agent job: enrich, not decide</h4>
+          <p>The agent's role is to attach Kubernetes context (pod name, namespace, deployment) and forward. It should not do expensive work like tail sampling — that's the gateway's job.</p>
+        </div>
+        <div class="callout good">
+          <h4>✓ k8sattributes processor</h4>
+          <p>Automatically attaches pod and namespace metadata to every span and metric by reading the Kubernetes API. Without this, your telemetry has no idea which pod it came from.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GATEWAY CONFIG -->
+  <div id="yaml-gateway" class="yaml-panel">
+    <div class="yaml-panel-header">
+      <strong>Gateway config (centralised tier)</strong>
+      <span>— receives from agents, samples, routes to multiple backends</span>
+    </div>
+    <div class="yaml-body">
+<pre><span class="y-comment"># gateway-config.yaml — centralised, scaled horizontally</span>
+<span class="y-comment"># Goal: sample intelligently, scrub PII, route to backends</span>
+
+<span class="y-section">receivers:</span>
+  <span class="y-key">otlp:</span>
+    <span class="y-key">protocols:</span>
+      <span class="y-key">grpc:</span> <span class="y-key">endpoint:</span> <span class="y-str">0.0.0.0:4317</span>
+
+<span class="y-section">processors:</span>
+  <span class="y-key">memory_limiter:</span>
+    <span class="y-key">check_interval:</span> <span class="y-val">1s</span>
+    <span class="y-key">limit_mib:</span> <span class="y-val">2000</span>                   <span class="y-comment"># gateway needs more headroom</span>
+    <span class="y-key">spike_limit_mib:</span> <span class="y-val">400</span>
+
+  <span class="y-key">tail_sampling:</span>                        <span class="y-comment"># decision AFTER trace completes</span>
+    <span class="y-key">decision_wait:</span> <span class="y-val">10s</span>                 <span class="y-comment"># wait for all spans to arrive</span>
+    <span class="y-key">policies:</span>
+      <span class="y-key">- name:</span> <span class="y-str">keep-errors</span>               <span class="y-comment"># always keep failed traces</span>
+        <span class="y-key">type:</span> <span class="y-val">status_code</span>
+        <span class="y-key">status_code:</span> <span class="y-val">{status_codes: [ERROR]}</span>
+      <span class="y-key">- name:</span> <span class="y-str">keep-slow</span>                 <span class="y-comment"># keep anything over 1 second</span>
+        <span class="y-key">type:</span> <span class="y-val">latency</span>
+        <span class="y-key">latency:</span> <span class="y-val">{threshold_ms: 1000}</span>
+      <span class="y-key">- name:</span> <span class="y-str">sample-healthy</span>            <span class="y-comment"># keep 10% of normal traffic</span>
+        <span class="y-key">type:</span> <span class="y-val">probabilistic</span>
+        <span class="y-key">probabilistic:</span> <span class="y-val">{sampling_percentage: 10}</span>
+
+  <span class="y-key">attributes:</span>                           <span class="y-comment"># scrub PII before exporting</span>
+    <span class="y-key">actions:</span>
+      <span class="y-key">- key:</span> <span class="y-str">user.email</span>
+        <span class="y-key">action:</span> <span class="y-val">delete</span>
+      <span class="y-key">- key:</span> <span class="y-str">http.request.header.authorization</span>
+        <span class="y-key">action:</span> <span class="y-val">delete</span>
+      <span class="y-key">- key:</span> <span class="y-str">user.id</span>
+        <span class="y-key">action:</span> <span class="y-val">hash</span>                   <span class="y-comment"># hash instead of delete</span>
+
+  <span class="y-key">batch:</span>
+    <span class="y-key">send_batch_size:</span> <span class="y-val">2000</span>
+    <span class="y-key">timeout:</span> <span class="y-val">10s</span>
+
+<span class="y-section">exporters:</span>
+  <span class="y-key">otlp/jaeger:</span>                          <span class="y-comment"># traces → Jaeger</span>
+    <span class="y-key">endpoint:</span> <span class="y-str">jaeger:4317</span>
+  <span class="y-key">prometheusremotewrite:</span>               <span class="y-comment"># metrics → Prometheus</span>
+    <span class="y-key">endpoint:</span> <span class="y-str">http://prometheus:9090/api/v1/write</span>
+  <span class="y-key">otlp/loki:</span>                            <span class="y-comment"># logs → Loki</span>
+    <span class="y-key">endpoint:</span> <span class="y-str">loki:3100</span>
+
+<span class="y-section">service:</span>
+  <span class="y-key">pipelines:</span>
+    <span class="y-key">traces:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, tail_sampling, attributes, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[otlp/jaeger]</span>
+    <span class="y-key">metrics:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, attributes, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[prometheusremotewrite]</span>
+    <span class="y-key">logs:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, attributes, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[otlp/loki]</span></pre>
+
+      <div class="callout-grid">
+        <div class="callout note">
+          <h4>Named exporters: otlp/jaeger, otlp/loki</h4>
+          <p>You can have multiple exporters of the same type using <code>type/name</code> syntax. This is how you fan out to separate backends per signal from a single gateway.</p>
+        </div>
+        <div class="callout warn">
+          <h4>⚠ Tail sampling requires stateful collector</h4>
+          <p>The gateway must buffer all spans for a trace window (10s here) before deciding. This means all spans for the same trace must route to the same gateway instance.</p>
+        </div>
+        <div class="callout good">
+          <h4>✓ PII scrubbing at the gateway</h4>
+          <p>Deleting and hashing sensitive attributes centrally means you never have to touch application code to change what gets stored. One config change applies everywhere.</p>
+        </div>
+        <div class="callout info">
+          <h4>Three backends, one pipeline</h4>
+          <p>Each signal routes to its own backend. Traces go to Jaeger, metrics to Prometheus, logs to Loki. Each team can own their tool without coupling to others.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT VS GATEWAY -->
+<div class="section-label">Topology — Agent vs. Gateway</div>
+<div class="scale-compare">
+  <div class="scale-card small">
+    <div class="scale-card-header">
+      <span class="scale-badge">SMALL</span>
+      <strong style="font-size:13px;">Single collector</strong>
+    </div>
+    <div class="scale-card-body">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">One Collector instance handles everything. Runs as a sidecar container or on the same host as the app.</p>
+      <div class="topology">
+        <div style="margin-bottom:6px;">
+          <span class="topo-node topo-app">Your App</span>
+          <span class="topo-arrow">→ OTLP →</span>
+          <span class="topo-node topo-agent">Collector</span>
+          <span class="topo-arrow">→</span>
+          <span class="topo-node topo-back">Backend</span>
+        </div>
+      </div>
+      <ul style="list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:5px;">
+        <li style="font-size:12px;color:var(--muted);">✓ Simple — one config file</li>
+        <li style="font-size:12px;color:var(--muted);">✓ Low operational cost</li>
+        <li style="font-size:12px;color:var(--muted);">✓ Collector is optional at very low volume</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="scale-card large">
+    <div class="scale-card-header">
+      <span class="scale-badge">LARGE</span>
+      <strong style="font-size:13px;">Two-tier topology</strong>
+    </div>
+    <div class="scale-card-body">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Agents run per-node (DaemonSet in k8s). Gateways run as a central deployment, scaled horizontally.</p>
+      <div class="topology">
+        <div style="margin-bottom:4px;">
+          <span class="topo-node topo-app">Service A</span>
+          <span class="topo-node topo-app">Service B</span>
+          <span class="topo-node topo-app">Service C</span>
+        </div>
+        <div style="margin:4px 0;color:var(--muted);font-size:10px;">↓ OTLP (localhost)</div>
+        <div style="margin-bottom:4px;">
+          <span class="topo-node topo-agent">Agent (node 1)</span>
+          <span class="topo-node topo-agent">Agent (node 2)</span>
+        </div>
+        <div style="margin:4px 0;color:var(--muted);font-size:10px;">↓ forward</div>
+        <div style="margin-bottom:4px;">
+          <span class="topo-node topo-gate">Gateway ×3</span>
+        </div>
+        <div style="margin:4px 0;color:var(--muted);font-size:10px;">↓ route per signal</div>
+        <div>
+          <span class="topo-node topo-back">Jaeger</span>
+          <span class="topo-node topo-back">Prometheus</span>
+          <span class="topo-node topo-back">Loki</span>
+        </div>
+      </div>
+      <ul style="list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:5px;">
+        <li style="font-size:12px;color:var(--muted);">✓ Agents handle local buffering and k8s enrichment</li>
+        <li style="font-size:12px;color:var(--muted);">✓ Gateways handle sampling, PII, routing</li>
+        <li style="font-size:12px;color:var(--muted);">✓ Gateway tier scales independently from apps</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- PROCESSOR DETAIL -->
+<div class="section-label">Critical Processors — What They Do</div>
+<div class="processor-grid">
+  <div class="proc-card">
+    <div class="proc-card-header">
+      <span class="name">memory_limiter</span>
+      <span class="req-tag badge-req">required</span>
+    </div>
+    <div class="proc-card-body">
+      <p>Monitors the Collector's memory usage. When it exceeds the limit, it starts dropping data and returning errors to senders. Without this, a traffic spike OOMs the Collector process entirely — taking your entire observability pipeline down.</p>
+      <pre><span class="y-key">memory_limiter:</span>
+  <span class="y-key">check_interval:</span>  <span class="y-val">1s</span>
+  <span class="y-key">limit_mib:</span>       <span class="y-val">400</span>   <span class="y-comment"># hard limit</span>
+  <span class="y-key">spike_limit_mib:</span> <span class="y-val">100</span>   <span class="y-comment"># soft buffer</span></pre>
+    </div>
+  </div>
+
+  <div class="proc-card">
+    <div class="proc-card-header">
+      <span class="name">batch</span>
+      <span class="req-tag badge-req">required</span>
+    </div>
+    <div class="proc-card-body">
+      <p>Groups spans, metrics, and logs into batches before sending to exporters. Without batching, every individual span triggers a separate network call to your backend — which is both slow and expensive.</p>
+      <pre><span class="y-key">batch:</span>
+  <span class="y-key">send_batch_size:</span> <span class="y-val">1000</span>  <span class="y-comment"># send at 1000 items</span>
+  <span class="y-key">timeout:</span>         <span class="y-val">5s</span>    <span class="y-comment"># or every 5s</span>
+  <span class="y-key">send_batch_max_size:</span> <span class="y-val">2000</span></pre>
+    </div>
+  </div>
+
+  <div class="proc-card">
+    <div class="proc-card-header">
+      <span class="name">attributes</span>
+      <span class="req-tag badge-rec">common</span>
+    </div>
+    <div class="proc-card-body">
+      <p>Add, update, delete, or hash attributes on spans, metrics, or logs. The primary tool for PII scrubbing and for adding environment context (e.g. adding a <code>deployment.env</code> tag to everything).</p>
+      <pre><span class="y-key">attributes:</span>
+  <span class="y-key">actions:</span>
+    <span class="y-key">- key:</span> <span class="y-str">user.email</span>
+      <span class="y-key">action:</span> <span class="y-val">delete</span>
+    <span class="y-key">- key:</span> <span class="y-str">deployment.env</span>
+      <span class="y-key">value:</span>  <span class="y-str">production</span>
+      <span class="y-key">action:</span> <span class="y-val">upsert</span></pre>
+    </div>
+  </div>
+
+  <div class="proc-card">
+    <div class="proc-card-header">
+      <span class="name">filter</span>
+      <span class="req-tag badge-rec">common</span>
+    </div>
+    <div class="proc-card-body">
+      <p>Drop entire spans, metrics, or log records based on conditions. Use to suppress noisy health check endpoints or internal polling traffic that clutters your traces.</p>
+      <pre><span class="y-key">filter:</span>
+  <span class="y-key">traces:</span>
+    <span class="y-key">span:</span>
+      <span class="y-comment"># drop health check spans</span>
+      <span class="y-key">- '</span><span class="y-str">attributes["http.route"] == "/healthz"</span><span class="y-key">'</span>
+      <span class="y-key">- '</span><span class="y-str">attributes["http.route"] == "/ready"</span><span class="y-key">'</span></pre>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Where to go next →</strong>  04 — Sampling (tail-based policy design in depth)  //  05 — Distributed tracing &amp; context propagation
+</div>
+
+<script>
+function showYaml(name, btn) {
+  document.querySelectorAll('.yaml-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.yaml-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('yaml-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>

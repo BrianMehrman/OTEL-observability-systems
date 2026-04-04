@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTEL Distributed Tracing — Context Propagation</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header { border-left: 3px solid var(--green); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--green); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; font-family: var(--mono); font-size: 11px; line-height: 1.7; overflow-x: auto; }
+  .y-key { color: var(--accent); }
+  .y-val { color: var(--green); }
+  .y-str { color: var(--yellow); }
+  .y-comment { color: #334155; }
+  .y-purple { color: var(--purple); }
+  .y-orange { color: var(--orange); }
+  .y-red { color: var(--red); }
+
+  /* ── WHAT IS CONTEXT PROPAGATION ── */
+  .concept-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 40px;
+  }
+
+  /* ── SERVICE JOURNEY DIAGRAM ── */
+  .journey {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px;
+    margin-bottom: 40px;
+  }
+  .journey-services {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: 24px;
+  }
+  .svc-block {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 14px;
+    position: relative;
+  }
+  .svc-block + .svc-block { margin-left: 0; border-left: none; border-radius: 0; }
+  .svc-block:last-child { border-radius: 0 5px 5px 0; }
+  .svc-block:first-child { border-radius: 5px 0 0 5px; }
+
+  .svc-name { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .svc-lang { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 10px; }
+  .svc-span {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    margin-bottom: 4px;
+    border: 1px solid;
+  }
+  .svc-arrow-wrap {
+    width: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .svc-arrow-wrap::before {
+    content: '';
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+  }
+  .svc-arrow-wrap .arrow-head {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--purple);
+    position: relative;
+    z-index: 1;
+    white-space: nowrap;
+  }
+
+  /* header propagation visual */
+  .header-flow {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 16px;
+    margin-top: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .hf-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .hf-header { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px; flex-wrap: wrap; }
+  .hf-key { color: var(--accent); flex-shrink: 0; }
+  .hf-val { color: var(--green); word-break: break-all; }
+  .hf-comment { color: #334155; flex-shrink: 0; }
+
+  /* trace waterfall */
+  .waterfall-container { margin-top: 20px; }
+  .wf-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .wf-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .wf-label { width: 180px; flex-shrink: 0; font-family: var(--mono); font-size: 10px; color: var(--text); }
+  .wf-label .wf-svc { display: block; color: var(--muted); font-size: 9px; }
+  .wf-track { flex: 1; height: 22px; background: var(--surface2); border-radius: 2px; position: relative; }
+  .wf-span { position: absolute; top: 2px; height: 18px; border-radius: 2px; display: flex; align-items: center; padding: 0 6px; font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.8); }
+  .wf-dur { width: 55px; flex-shrink: 0; font-family: var(--mono); font-size: 10px; color: var(--muted); text-align: right; }
+
+  /* ── PROPAGATION FORMATS ── */
+  .formats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 40px; }
+  .format-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .format-card-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .format-card-header .name { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .format-card-header .rec { font-family: var(--mono); font-size: 9px; padding: 2px 6px; border-radius: 2px; }
+  .rec-std { background: #0c2310; color: var(--green); border: 1px solid #1a4020; }
+  .rec-leg { background: #1f1a08; color: var(--orange); border: 1px solid #3d3210; }
+  .format-card-body { padding: 14px; }
+  .format-card-body p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+
+  /* ── BROKEN TRACE SCENARIOS ── */
+  .broken-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+  .broken-card { background: var(--surface); border: 1px solid #3d1a1a; border-radius: 8px; overflow: hidden; }
+  .broken-card-header { padding: 12px 16px; background: #1f0c0c; border-bottom: 1px solid #3d1a1a; }
+  .broken-card-header h4 { font-size: 13px; font-weight: 600; color: var(--red); }
+  .broken-card-header .scenario { font-size: 11px; color: var(--muted); }
+  .broken-card-body { padding: 16px; }
+  .broken-card-body p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .broken-card-body .fix { font-size: 12px; color: var(--green); font-family: var(--mono); }
+
+  /* ── ASYNC PATTERNS ── */
+  .async-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+  .async-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .async-card-header { padding: 12px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .async-card-header h4 { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--accent); }
+  .async-card-body { padding: 16px; }
+  .async-card-body p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+
+  /* checklist */
+  .checklist { display: flex; flex-direction: column; gap: 5px; margin-bottom: 40px; }
+  .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; font-size: 12px; }
+  .check-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .check-text { color: var(--text); }
+  .check-sub { color: var(--muted); font-size: 11px; display: block; margin-top: 2px; }
+
+  .note { background: #0c1f10; border: 1px solid #1a4025; border-radius: 6px; padding: 16px 20px; font-size: 12px; color: #86efac; font-family: var(--mono); }
+  .note strong { color: var(--green); }
+
+  @media (max-width: 700px) {
+    .formats-grid, .broken-grid, .async-grid { grid-template-columns: 1fr; }
+    .journey-services { flex-direction: column; }
+    .svc-block, .svc-block + .svc-block { border-left: 1px solid var(--border); border-radius: 5px; margin-left: 0; }
+    .svc-arrow-wrap { transform: rotate(90deg); height: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// 05 — Distributed Tracing</div>
+  <h1>Context Propagation<br>— how traces cross service boundaries</h1>
+  <p>A distributed trace is only possible if every service in the chain passes context to the next. This section covers how that works, what can go wrong, and how to handle async patterns like queues and background jobs.</p>
+</header>
+
+<!-- THE CORE IDEA -->
+<div class="section-label">The Core Idea</div>
+<div class="concept-box">
+  <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">A trace spans multiple services. Each service creates spans and passes a small packet of context — the <strong style="color:var(--text)">trace context</strong> — to every downstream call it makes. Without this, each service records isolated spans with no connection to the others.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Without propagation</div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:14px;font-family:var(--mono);font-size:11px;">
+        <div style="color:var(--accent);margin-bottom:4px;">api-gateway</div>
+        <div style="color:var(--muted);padding-left:12px;margin-bottom:8px;">trace_id: <span style="color:#4f9cf9">aaa111</span></div>
+        <div style="color:var(--green);margin-bottom:4px;">order-service</div>
+        <div style="color:var(--muted);padding-left:12px;margin-bottom:8px;">trace_id: <span style="color:#3ecf8e">bbb222</span> ← different!</div>
+        <div style="color:var(--purple);margin-bottom:4px;">payment-service</div>
+        <div style="color:var(--muted);padding-left:12px;">trace_id: <span style="color:#a78bfa">ccc333</span> ← disconnected</div>
+        <div style="margin-top:10px;font-size:10px;color:#334155;">// Three isolated traces. No way to connect them.</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">With propagation</div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:14px;font-family:var(--mono);font-size:11px;">
+        <div style="color:var(--accent);margin-bottom:4px;">api-gateway</div>
+        <div style="color:var(--muted);padding-left:12px;margin-bottom:8px;">trace_id: <span style="color:#3ecf8e">abc123</span></div>
+        <div style="color:var(--green);margin-bottom:4px;">order-service</div>
+        <div style="color:var(--muted);padding-left:12px;margin-bottom:8px;">trace_id: <span style="color:#3ecf8e">abc123</span> ← same</div>
+        <div style="color:var(--purple);margin-bottom:4px;">payment-service</div>
+        <div style="color:var(--muted);padding-left:12px;">trace_id: <span style="color:#3ecf8e">abc123</span> ← connected</div>
+        <div style="margin-top:10px;font-size:10px;color:var(--green);">// One trace. Full request journey visible.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SERVICE JOURNEY -->
+<div class="section-label">A Request Flowing Through Four Services</div>
+<div class="journey">
+  <div class="journey-services">
+    <div class="svc-block">
+      <div class="svc-name">api-gateway</div>
+      <div class="svc-lang">Node.js</div>
+      <div class="svc-span" style="border-color:#1a3a5c;color:#93c5fd;background:#0c1f35;">ROOT SPAN<br>POST /checkout</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:var(--mono);">Generates:<br>trace_id: abc123<br>span_id: s001</div>
+    </div>
+    <div class="svc-arrow-wrap"><div class="arrow-head">W3C headers →</div></div>
+    <div class="svc-block">
+      <div class="svc-name">order-service</div>
+      <div class="svc-lang">Python</div>
+      <div class="svc-span" style="border-color:#1a4530;color:#6ee7b7;background:#0d2318;">CHILD SPAN<br>createOrder()</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:var(--mono);">Reads:<br>trace_id: abc123<br>parent: s001<br>span_id: s002</div>
+    </div>
+    <div class="svc-arrow-wrap"><div class="arrow-head">W3C headers →</div></div>
+    <div class="svc-block">
+      <div class="svc-name">payment-service</div>
+      <div class="svc-lang">Go</div>
+      <div class="svc-span" style="border-color:#3d1d7a;color:#c4b5fd;background:#1e0c40;">CHILD SPAN<br>charge()</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:var(--mono);">Reads:<br>trace_id: abc123<br>parent: s002<br>span_id: s003</div>
+    </div>
+    <div class="svc-arrow-wrap"><div class="arrow-head">W3C headers →</div></div>
+    <div class="svc-block">
+      <div class="svc-name">notification-svc</div>
+      <div class="svc-lang">Java</div>
+      <div class="svc-span" style="border-color:#3d3210;color:#fcd34d;background:#1f1a08;">CHILD SPAN<br>sendEmail()</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:var(--mono);">Reads:<br>trace_id: abc123<br>parent: s003<br>span_id: s004</div>
+    </div>
+  </div>
+
+  <div class="header-flow">
+    <div class="hf-label">HTTP headers on each outgoing call</div>
+    <div class="hf-header">
+      <span class="hf-key">traceparent:</span>
+      <span class="hf-val">00-abc123def456abc123def456abc123de-s002-01</span>
+      <span class="hf-comment">← version-traceId-spanId-flags</span>
+    </div>
+    <div class="hf-header">
+      <span class="hf-key">tracestate:</span>
+      <span class="hf-val">vendor1=value1,vendor2=value2</span>
+      <span class="hf-comment">← optional vendor-specific state</span>
+    </div>
+  </div>
+
+  <div class="waterfall-container">
+    <div class="wf-header"><span>Resulting waterfall — all spans share trace_id abc123</span></div>
+    <div class="wf-row">
+      <div class="wf-label">api-gateway<span class="wf-svc">POST /checkout</span></div>
+      <div class="wf-track"><div class="wf-span" style="left:0%;width:100%;background:#1a3a6e;">412ms</div></div>
+      <div class="wf-dur">412ms</div>
+    </div>
+    <div class="wf-row" style="padding-left:20px">
+      <div class="wf-label">order-service<span class="wf-svc">createOrder()</span></div>
+      <div class="wf-track"><div class="wf-span" style="left:2%;width:88%;background:#0d3d2a;">362ms</div></div>
+      <div class="wf-dur">362ms</div>
+    </div>
+    <div class="wf-row" style="padding-left:40px">
+      <div class="wf-label">postgres<span class="wf-svc">INSERT orders</span></div>
+      <div class="wf-track"><div class="wf-span" style="left:4%;width:28%;background:#1a3a2a;">110ms</div></div>
+      <div class="wf-dur">110ms</div>
+    </div>
+    <div class="wf-row" style="padding-left:40px">
+      <div class="wf-label">payment-service<span class="wf-svc">charge()</span></div>
+      <div class="wf-track"><div class="wf-span" style="left:35%;width:52%;background:#2a1a5e;">214ms</div></div>
+      <div class="wf-dur">214ms</div>
+    </div>
+    <div class="wf-row" style="padding-left:60px">
+      <div class="wf-label">notification-svc<span class="wf-svc">sendEmail()</span></div>
+      <div class="wf-track"><div class="wf-span" style="left:88%;width:10%;background:#3d3210;">40ms</div></div>
+      <div class="wf-dur">40ms</div>
+    </div>
+  </div>
+</div>
+
+<!-- PROPAGATION FORMATS -->
+<div class="section-label">Propagation Formats</div>
+<div class="formats-grid">
+  <div class="format-card">
+    <div class="format-card-header">
+      <span class="name" style="color:var(--green)">W3C TraceContext</span>
+      <span class="rec rec-std">recommended</span>
+    </div>
+    <div class="format-card-body">
+      <p>The IETF standard. Two headers: <code>traceparent</code> carries the trace and span IDs, <code>tracestate</code> carries vendor-specific data. Supported by all OTEL SDKs and most modern APM tools.</p>
+      <pre><span class="y-key">traceparent:</span> <span class="y-val">00-{traceId}-{spanId}-{flags}</span>
+<span class="y-key">tracestate:</span>  <span class="y-val">vendor=value</span>
+
+<span class="y-comment"># Example</span>
+<span class="y-key">traceparent:</span> <span class="y-val">00-abc123…32chars…def-f9a2b1c3…16chars-01</span></pre>
+    </div>
+  </div>
+
+  <div class="format-card">
+    <div class="format-card-header">
+      <span class="name" style="color:var(--orange)">B3 (Zipkin)</span>
+      <span class="rec rec-leg">legacy</span>
+    </div>
+    <div class="format-card-body">
+      <p>Originated with Zipkin, widely used in older microservice stacks. Two flavours: multi-header (separate headers per field) and single-header. The OTEL SDK supports both for compatibility with existing systems.</p>
+      <pre><span class="y-key">X-B3-TraceId:</span>      <span class="y-val">abc123def456…</span>
+<span class="y-key">X-B3-SpanId:</span>       <span class="y-val">f9a2b1c3…</span>
+<span class="y-key">X-B3-ParentSpanId:</span> <span class="y-val">d3e4c5f6…</span>
+<span class="y-key">X-B3-Sampled:</span>      <span class="y-val">1</span></pre>
+    </div>
+  </div>
+
+  <div class="format-card">
+    <div class="format-card-header">
+      <span class="name" style="color:var(--muted)">Jaeger / AWS X-Ray</span>
+      <span class="rec rec-leg">vendor</span>
+    </div>
+    <div class="format-card-body">
+      <p>Vendor-specific formats. If you're migrating from Jaeger or running on AWS, the OTEL SDK can be configured to read and write these alongside W3C headers during the transition period.</p>
+      <pre><span class="y-comment"># Jaeger</span>
+<span class="y-key">uber-trace-id:</span> <span class="y-val">{traceId}:{spanId}:{parentId}:{flags}</span>
+
+<span class="y-comment"># AWS X-Ray</span>
+<span class="y-key">X-Amzn-Trace-Id:</span> <span class="y-val">Root=1-…;Parent=…;Sampled=1</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- BROKEN TRACES -->
+<div class="section-label">What Breaks Trace Continuity</div>
+<div class="broken-grid">
+  <div class="broken-card">
+    <div class="broken-card-header">
+      <h4>Missing headers on outgoing calls</h4>
+      <div class="scenario">Scenario: custom HTTP client bypasses the SDK</div>
+    </div>
+    <div class="broken-card-body">
+      <p>Any HTTP call made with a raw client (e.g. <code>urllib.request</code> or <code>fetch</code> called directly) won't have propagation headers injected. The downstream service starts a new root span.</p>
+      <div class="fix">→ Use the OTEL-instrumented HTTP client, or manually inject headers:<br><br></div>
+      <pre><span class="y-comment"># Python — manual injection</span>
+<span class="y-key">from</span> <span class="y-val">opentelemetry</span> <span class="y-key">import</span> propagate
+
+<span class="y-orange">headers</span> = {}
+propagate.inject(<span class="y-orange">headers</span>)
+requests.get(url, headers=<span class="y-orange">headers</span>)</pre>
+    </div>
+  </div>
+
+  <div class="broken-card">
+    <div class="broken-card-header">
+      <h4>Third-party service in the call chain</h4>
+      <div class="scenario">Scenario: external API that doesn't support OTEL</div>
+    </div>
+    <div class="broken-card-body">
+      <p>If your app calls Stripe, Twilio, or any external service, that service won't pass context back. The trace ends at your outbound call. This is expected — model it as a leaf span.</p>
+      <div class="fix">→ Add an explicit span wrapping the call with the result metadata:</div>
+      <pre><span class="y-key">with</span> tracer.start_as_current_span(<span class="y-str">"stripe.charge"</span>) <span class="y-key">as</span> span:
+    span.set_attribute(<span class="y-str">"stripe.charge_id"</span>, charge_id)
+    span.set_attribute(<span class="y-str">"payment.amount"</span>, amount)
+    result = stripe.charge(...)
+    <span class="y-key">if</span> result.error:
+        span.set_status(StatusCode.ERROR)</pre>
+    </div>
+  </div>
+
+  <div class="broken-card">
+    <div class="broken-card-header">
+      <h4>Mixed propagation formats</h4>
+      <div class="scenario">Scenario: migrating from Zipkin/Jaeger to OTEL</div>
+    </div>
+    <div class="broken-card-body">
+      <p>An older service emits B3 headers. A newer service only reads W3C headers. The trace breaks at that boundary because neither service understands the other's format.</p>
+      <div class="fix">→ Configure OTEL SDK to accept multiple formats during transition:</div>
+      <pre><span class="y-comment"># Enable both formats simultaneously</span>
+<span class="y-key">OTEL_PROPAGATORS</span>=<span class="y-str">tracecontext,baggage,b3multi</span>
+
+<span class="y-comment"># Or in code</span>
+<span class="y-key">from</span> opentelemetry.propagators.composite <span class="y-key">import</span> CompositePropagator
+<span class="y-orange">propagator</span> = CompositePropagator([TraceContextPropagator(), B3MultiFormatPropagator()])</pre>
+    </div>
+  </div>
+
+  <div class="broken-card">
+    <div class="broken-card-header">
+      <h4>Context lost across thread / async boundaries</h4>
+      <div class="scenario">Scenario: spawning threads, async tasks, or workers</div>
+    </div>
+    <div class="broken-card-body">
+      <p>Trace context is stored in a context object that is thread-local by default. Spawning a new thread or creating an async task without propagating the context creates a new root span.</p>
+      <div class="fix">→ Explicitly attach context when crossing boundaries:</div>
+      <pre><span class="y-comment"># Python — passing context to a thread</span>
+<span class="y-key">from</span> opentelemetry <span class="y-key">import</span> context
+
+<span class="y-orange">ctx</span> = context.get_current()  <span class="y-comment"># capture here</span>
+
+<span class="y-key">def</span> worker():
+    token = context.attach(<span class="y-orange">ctx</span>)  <span class="y-comment"># restore here</span>
+    <span class="y-key">try</span>:
+        do_work()
+    <span class="y-key">finally</span>:
+        context.detach(token)</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ASYNC PATTERNS -->
+<div class="section-label">Async Patterns — Queues & Background Jobs</div>
+<div class="async-grid">
+  <div class="async-card">
+    <div class="async-card-header"><h4>Message Queue (Kafka, SQS, RabbitMQ)</h4></div>
+    <div class="async-card-body">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">The producer and consumer are decoupled in time. Context must be serialised into the message headers/attributes and deserialised by the consumer.</p>
+      <pre><span class="y-comment"># Producer — inject context into message</span>
+<span class="y-key">headers</span> = {}
+propagate.inject(<span class="y-key">headers</span>)
+kafka.produce(topic, value=payload, headers=<span class="y-key">headers</span>)
+
+<span class="y-comment"># Consumer — extract context from message</span>
+<span class="y-orange">ctx</span> = propagate.extract(msg.headers)
+<span class="y-key">with</span> tracer.start_as_current_span(
+    <span class="y-str">"process-order"</span>,
+    context=<span class="y-orange">ctx</span>,
+    kind=SpanKind.CONSUMER
+) <span class="y-key">as</span> span:
+    process(msg.value)</pre>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px;">This creates a <em>link</em> between the producer trace and the consumer trace — the two appear as separate but connected traces in your backend.</p>
+    </div>
+  </div>
+
+  <div class="async-card">
+    <div class="async-card-header"><h4>Background Jobs & Scheduled Tasks</h4></div>
+    <div class="async-card-body">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Scheduled jobs have no incoming request to extract context from. They start new root spans. Enqueue requests can pass context to the job via a job payload field.</p>
+      <pre><span class="y-comment"># Enqueueing — store context in job payload</span>
+<span class="y-key">headers</span> = {}
+propagate.inject(<span class="y-key">headers</span>)
+queue.enqueue(
+    <span class="y-str">"send-invoice"</span>,
+    payload={<span class="y-str">"order_id"</span>: order_id},
+    trace_context=<span class="y-key">headers</span>  <span class="y-comment"># store as job metadata</span>
+)
+
+<span class="y-comment"># Job handler — restore context</span>
+<span class="y-orange">ctx</span> = propagate.extract(job.trace_context)
+<span class="y-key">with</span> tracer.start_as_current_span(
+    <span class="y-str">"send-invoice"</span>,
+    context=<span class="y-orange">ctx</span>
+) <span class="y-key">as</span> span:
+    send_invoice(job.payload)</pre>
+    </div>
+  </div>
+</div>
+
+<!-- DEPLOYMENT CHECKLIST -->
+<div class="section-label">Deployment Checklist</div>
+<div class="checklist">
+  <div class="check-item">
+    <span class="check-icon">✅</span>
+    <div><span class="check-text">All services have OTEL SDK installed and auto-instrumentation enabled</span><span class="check-sub">Covers HTTP, DB, and framework instrumentation with no code changes</span></div>
+  </div>
+  <div class="check-item">
+    <span class="check-icon">✅</span>
+    <div><span class="check-text">All services are configured with W3C TraceContext as the primary propagator</span><span class="check-sub">Set via OTEL_PROPAGATORS=tracecontext,baggage in environment config</span></div>
+  </div>
+  <div class="check-item">
+    <span class="check-icon">✅</span>
+    <div><span class="check-text">Any legacy B3 or Jaeger services have multi-format propagation enabled</span><span class="check-sub">OTEL_PROPAGATORS=tracecontext,baggage,b3multi during migration</span></div>
+  </div>
+  <div class="check-item">
+    <span class="check-icon">✅</span>
+    <div><span class="check-text">Message queues inject context in producers and extract it in consumers</span><span class="check-sub">Manual propagate.inject() / propagate.extract() calls required</span></div>
+  </div>
+  <div class="check-item">
+    <span class="check-icon">✅</span>
+    <div><span class="check-text">Thread and async boundaries explicitly propagate context</span><span class="check-sub">context.get_current() at spawn, context.attach() inside the worker</span></div>
+  </div>
+  <div class="check-item">
+    <span class="check-icon">✅</span>
+    <div><span class="check-text">External service calls are wrapped in manual spans with result attributes</span><span class="check-sub">Stripe, Twilio, etc. won't continue the trace — model them as leaf spans</span></div>
+  </div>
+  <div class="check-item">
+    <span class="check-icon">✅</span>
+    <div><span class="check-text">service.name attribute is set consistently and uniquely per service</span><span class="check-sub">OTEL_SERVICE_NAME=order-service — used to identify services in trace backends</span></div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Guide complete →</strong>  Return to add ecosystem section: backends, SaaS tools, language SDKs, and OSS stack recommendations per scale tier
+</div>
+
+</body>
+</html>

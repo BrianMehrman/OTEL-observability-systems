@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenTelemetry — Architecture Overview</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --accent2: #7b5ea7;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-left: 3px solid var(--accent);
+    padding-left: 20px;
+    margin-bottom: 48px;
+  }
+  header .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+  }
+  header p {
+    margin-top: 10px;
+    color: var(--muted);
+    max-width: 620px;
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── SIGNAL CARDS (top row) ── */
+  .signals-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 40px;
+  }
+  .signal-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 2px solid;
+    border-radius: 6px;
+    padding: 20px;
+  }
+  .signal-card.traces { border-top-color: var(--accent); }
+  .signal-card.metrics { border-top-color: var(--green); }
+  .signal-card.logs { border-top-color: var(--orange); }
+
+  .signal-card h3 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .signal-card h3 .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .traces .dot { background: var(--accent); }
+  .metrics .dot { background: var(--green); }
+  .logs .dot { background: var(--orange); }
+
+  .signal-card p { color: var(--muted); font-size: 13px; }
+  .signal-card .examples {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  /* ── PIPELINE DIAGRAM ── */
+  .pipeline {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 24px;
+    margin-bottom: 40px;
+  }
+
+  .pipe-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 8px;
+  }
+  .pipe-box {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 14px;
+    text-align: center;
+  }
+  .pipe-box .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .pipe-box .sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .pipe-arrow {
+    width: 36px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* ── COMPARISON GRID ── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+
+  .compare-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .compare-card .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .compare-card.small .card-header { background: #0d1a2a; }
+  .compare-card.large .card-header { background: #150d2a; }
+
+  .compare-card .card-header .badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .small .badge { background: #0c2340; color: var(--accent); }
+  .large .badge { background: #1e0c40; color: #a78bfa; }
+
+  .compare-card .card-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .compare-card .card-body {
+    padding: 20px;
+  }
+
+  /* ── ARCH DIAGRAM ── */
+  .arch {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .arch-layer {
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .arch-layer-title {
+    padding: 6px 12px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  .arch-layer-body {
+    padding: 10px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .arch-node {
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 10px;
+    border: 1px solid;
+  }
+
+  /* colours per layer */
+  .layer-app .arch-layer-title { background: #0c1f35; color: var(--accent); }
+  .layer-app .arch-node { background: #0c1f35; border-color: #1a3a5c; color: #93c5fd; }
+
+  .layer-sdk .arch-layer-title { background: #0d2318; color: var(--green); }
+  .layer-sdk .arch-node { background: #0d2318; border-color: #1a4530; color: #6ee7b7; }
+
+  .layer-collector .arch-layer-title { background: #1f1a08; color: var(--orange); }
+  .layer-collector .arch-node { background: #1f1a08; border-color: #3d3210; color: #fcd34d; }
+
+  .layer-backend .arch-layer-title { background: #1e0c40; color: #a78bfa; }
+  .layer-backend .arch-node { background: #1e0c40; border-color: #3d1d7a; color: #c4b5fd; }
+
+  .flow-arrow {
+    text-align: center;
+    color: var(--muted);
+    margin: 4px 0;
+    font-size: 16px;
+  }
+
+  /* ── COLLECTOR DETAIL ── */
+  .collector-detail {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 40px;
+  }
+  .collector-pipeline {
+    display: grid;
+    grid-template-columns: 1fr 24px 1fr 24px 1fr;
+    gap: 0;
+    align-items: start;
+  }
+  .col-stage {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 14px;
+  }
+  .col-stage h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-stage ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .col-stage ul li {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    padding: 3px 8px;
+    background: var(--bg);
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .col-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 14px;
+    padding-top: 20px;
+  }
+
+  /* ── KEY DECISIONS ── */
+  .decisions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 40px;
+  }
+  .decision-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px;
+  }
+  .decision-card .num {
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--border);
+    margin-bottom: 8px;
+  }
+  .decision-card h4 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .decision-card p {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ── FOOTER NOTE ── */
+  .note {
+    background: #0c1f10;
+    border: 1px solid #1a4025;
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-size: 12px;
+    color: #86efac;
+    font-family: var(--mono);
+  }
+  .note strong { color: var(--green); }
+
+  /* responsiveness */
+  @media (max-width: 700px) {
+    .signals-row, .compare-grid, .decisions { grid-template-columns: 1fr; }
+    .collector-pipeline { grid-template-columns: 1fr; }
+    .col-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// Architecture Guide</div>
+  <h1>OpenTelemetry — What it is<br>and how it fits together</h1>
+  <p>A high-level map of OTEL's components, from a single-service app to a large distributed system. Start here before diving into configuration.</p>
+</header>
+
+<!-- THE THREE SIGNALS -->
+<div class="section-label">The Three Signal Types</div>
+<div class="signals-row">
+  <div class="signal-card traces">
+    <h3><span class="dot"></span>Traces</h3>
+    <p>A trace follows a single request as it moves through your system. Each step is a <em>span</em>. Together they show you where time was spent and where failures occurred.</p>
+    <div class="examples">
+      <span class="tag">TraceID</span>
+      <span class="tag">SpanID</span>
+      <span class="tag">parent_span</span>
+      <span class="tag">duration_ms</span>
+      <span class="tag">status_code</span>
+    </div>
+  </div>
+  <div class="signal-card metrics">
+    <h3><span class="dot"></span>Metrics</h3>
+    <p>Numerical measurements over time — counters, gauges, histograms. Good for dashboards and alerting. They're cheap to store and fast to query.</p>
+    <div class="examples">
+      <span class="tag">http.request.duration</span>
+      <span class="tag">db.pool.active</span>
+      <span class="tag">queue.depth</span>
+      <span class="tag">error.rate</span>
+    </div>
+  </div>
+  <div class="signal-card logs">
+    <h3><span class="dot"></span>Logs</h3>
+    <p>Timestamped text records. You likely already have these. OTEL adds context — attaching trace and span IDs so logs can be linked back to a specific request.</p>
+    <div class="examples">
+      <span class="tag">severity</span>
+      <span class="tag">trace_id</span>
+      <span class="tag">span_id</span>
+      <span class="tag">resource attrs</span>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE OVERVIEW -->
+<div class="section-label">The Core Pipeline</div>
+<div class="pipeline">
+  <p style="color:var(--muted); font-size:12px; margin-bottom:20px;">Every OTEL setup follows the same pattern regardless of scale. What changes is <em>where</em> each stage lives and how complex it gets.</p>
+
+  <div class="pipe-row">
+    <div class="pipe-box" style="border-top:2px solid var(--accent)">
+      <div class="label">Your Application</div>
+      <div class="sub">Instrumented with OTEL SDK</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-box" style="border-top:2px solid var(--green)">
+      <div class="label">OTEL Collector</div>
+      <div class="sub">Receive → Process → Export</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-box" style="border-top:2px solid #a78bfa">
+      <div class="label">Observability Backend</div>
+      <div class="sub">Jaeger / Prometheus / Grafana / Datadog…</div>
+    </div>
+  </div>
+
+  <div style="margin-top:18px; padding-top:18px; border-top:1px solid var(--border); font-size:12px; color:var(--muted);">
+    <strong style="color:var(--text)">Key idea:</strong> The Collector sits between your app and the backend. This decouples your code from any specific vendor — you can swap backends without touching application code.
+  </div>
+</div>
+
+<!-- SMALL VS LARGE COMPARISON -->
+<div class="section-label">Small App vs. Large Distributed System</div>
+<div class="compare-grid">
+
+  <!-- SMALL -->
+  <div class="compare-card small">
+    <div class="card-header">
+      <span class="badge">SMALL</span>
+      <h3>Single service / small team</h3>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">A single API, a background worker, or a monolith. One deployment. Low volume. You want visibility fast with minimal overhead.</p>
+
+      <div class="arch">
+        <div class="arch-layer layer-app">
+          <div class="arch-layer-title">Application Layer</div>
+          <div class="arch-layer-body">
+            <span class="arch-node">Your API / Service</span>
+            <span class="arch-node">Auto-instrumentation</span>
+          </div>
+        </div>
+        <div class="flow-arrow">↓ OTLP/gRPC or HTTP</div>
+        <div class="arch-layer layer-collector">
+          <div class="arch-layer-title">Collector (Sidecar or same host)</div>
+          <div class="arch-layer-body">
+            <span class="arch-node">Single instance</span>
+            <span class="arch-node">Minimal processing</span>
+          </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="arch-layer layer-backend">
+          <div class="arch-layer-title">Backend (often hosted)</div>
+          <div class="arch-layer-body">
+            <span class="arch-node">Grafana Cloud</span>
+            <span class="arch-node">Honeycomb</span>
+            <span class="arch-node">New Relic</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="section-label" style="margin-bottom:8px;">What matters here</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;">
+          <li style="font-size:12px;color:var(--muted);">✓ Use <strong style="color:var(--text)">auto-instrumentation</strong> — zero code changes for common frameworks</li>
+          <li style="font-size:12px;color:var(--muted);">✓ Collector can run as a <strong style="color:var(--text)">sidecar or agent</strong> on the same box</li>
+          <li style="font-size:12px;color:var(--muted);">✓ One backend destination is fine</li>
+          <li style="font-size:12px;color:var(--muted);">✓ Default sampling (100%) is usually OK at low volume</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- LARGE -->
+  <div class="compare-card large">
+    <div class="card-header">
+      <span class="badge">LARGE</span>
+      <h3>Microservices / platform scale</h3>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">Dozens to hundreds of services. High request volume. Multiple teams. The collector tier becomes infrastructure in its own right.</p>
+
+      <div class="arch">
+        <div class="arch-layer layer-app">
+          <div class="arch-layer-title">Application Layer (many services)</div>
+          <div class="arch-layer-body">
+            <span class="arch-node">Service A</span>
+            <span class="arch-node">Service B</span>
+            <span class="arch-node">Service C…</span>
+            <span class="arch-node">SDKs per language</span>
+          </div>
+        </div>
+        <div class="flow-arrow">↓ OTLP to local agent</div>
+        <div class="arch-layer layer-sdk">
+          <div class="arch-layer-title">Agent Collectors (per node/pod)</div>
+          <div class="arch-layer-body">
+            <span class="arch-node">DaemonSet (k8s)</span>
+            <span class="arch-node">Local buffering</span>
+            <span class="arch-node">Initial filtering</span>
+          </div>
+        </div>
+        <div class="flow-arrow">↓ Forward to gateway</div>
+        <div class="arch-layer layer-collector">
+          <div class="arch-layer-title">Gateway Collectors (centralised)</div>
+          <div class="arch-layer-body">
+            <span class="arch-node">Tail-based sampling</span>
+            <span class="arch-node">PII scrubbing</span>
+            <span class="arch-node">Routing logic</span>
+            <span class="arch-node">Rate limiting</span>
+          </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="arch-layer layer-backend">
+          <div class="arch-layer-title">Multiple Backends</div>
+          <div class="arch-layer-body">
+            <span class="arch-node">Jaeger (traces)</span>
+            <span class="arch-node">Prometheus (metrics)</span>
+            <span class="arch-node">Loki (logs)</span>
+            <span class="arch-node">Datadog</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="section-label" style="margin-bottom:8px;">What matters here</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;">
+          <li style="font-size:12px;color:var(--muted);">✓ <strong style="color:var(--text)">Two-tier collector</strong> — agents close to apps, gateways for cross-cutting concerns</li>
+          <li style="font-size:12px;color:var(--muted);">✓ <strong style="color:var(--text)">Tail-based sampling</strong> — keep all error traces, drop healthy ones</li>
+          <li style="font-size:12px;color:var(--muted);">✓ Context propagation across service boundaries is critical</li>
+          <li style="font-size:12px;color:var(--muted);">✓ Fan-out to multiple backends for different teams / use cases</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COLLECTOR INTERNALS -->
+<div class="section-label">Inside the Collector — Receive → Process → Export</div>
+<div class="collector-detail">
+  <p style="color:var(--muted);font-size:12px;margin-bottom:20px;">The Collector is a standalone process (or set of processes). Every piece of telemetry passes through this three-stage pipeline. Understanding these stages is key to configuring OTEL well.</p>
+
+  <div class="collector-pipeline">
+    <div class="col-stage">
+      <h4>① Receivers</h4>
+      <ul>
+        <li>otlp/grpc</li>
+        <li>otlp/http</li>
+        <li>prometheus</li>
+        <li>jaeger</li>
+        <li>zipkin</li>
+        <li>hostmetrics</li>
+        <li>k8s events</li>
+      </ul>
+    </div>
+    <div class="col-arrow">→</div>
+    <div class="col-stage">
+      <h4>② Processors</h4>
+      <ul>
+        <li>batch</li>
+        <li>memory_limiter</li>
+        <li>attributes</li>
+        <li>filter</li>
+        <li>tail_sampling</li>
+        <li>transform</li>
+        <li>resourcedetection</li>
+      </ul>
+    </div>
+    <div class="col-arrow">→</div>
+    <div class="col-stage">
+      <h4>③ Exporters</h4>
+      <ul>
+        <li>otlp (backend)</li>
+        <li>prometheus</li>
+        <li>jaeger</li>
+        <li>datadog</li>
+        <li>logging (debug)</li>
+        <li>file</li>
+        <li>kafka</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="margin-top:18px;font-size:12px;color:var(--muted);padding-top:16px;border-top:1px solid var(--border)">
+    <strong style="color:var(--text)">Note on processors:</strong> The <code style="font-family:var(--mono);color:var(--orange)">batch</code> processor is almost always required — it prevents flooding backends with individual spans. The <code style="font-family:var(--mono);color:var(--orange)">memory_limiter</code> is equally important; without it, a traffic spike can OOM your collector.
+  </div>
+</div>
+
+<!-- SAMPLING NOTE -->
+<div class="section-label">Sampling — The Volume Problem</div>
+<div class="pipeline" style="margin-bottom:40px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div>
+      <h4 style="font-size:13px;margin-bottom:8px;font-family:var(--mono);color:var(--accent)">Head-based sampling</h4>
+      <p style="font-size:12px;color:var(--muted)">The decision to record a trace is made <em>at the start</em> of the request. Simple and low overhead, but you cannot guarantee capturing error traces — the decision happens before you know if the request will fail.</p>
+      <div style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--muted)">Good fit → small/medium apps</div>
+    </div>
+    <div>
+      <h4 style="font-size:13px;margin-bottom:8px;font-family:var(--mono);color:#a78bfa">Tail-based sampling</h4>
+      <p style="font-size:12px;color:var(--muted)">The Collector buffers spans and makes the decision <em>after the trace is complete</em>. You can define rules: always keep errors, slow requests, or traces from specific users. More complex, requires stateful collector.</p>
+      <div style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--muted)">Good fit → large / high-volume apps</div>
+    </div>
+  </div>
+</div>
+
+<!-- KEY DECISIONS -->
+<div class="section-label">Six Decisions That Shape Your Setup</div>
+<div class="decisions">
+  <div class="decision-card">
+    <div class="num">01</div>
+    <h4>Auto vs. Manual instrumentation</h4>
+    <p>Auto-instrumentation covers HTTP, DB, queues with no code changes. Add manual spans for business logic that matters — checkout, payment, etc.</p>
+  </div>
+  <div class="decision-card">
+    <div class="num">02</div>
+    <h4>Direct export vs. Collector</h4>
+    <p>Small apps can export directly from the SDK to a backend. Add a Collector once you need sampling, PII scrubbing, or routing to multiple destinations.</p>
+  </div>
+  <div class="decision-card">
+    <div class="num">03</div>
+    <h4>Agent vs. Gateway collector</h4>
+    <p>Agents run per node and handle local buffering. Gateways run centrally and handle expensive operations. At scale you need both.</p>
+  </div>
+  <div class="decision-card">
+    <div class="num">04</div>
+    <h4>Sampling strategy</h4>
+    <p>100% sampling is fine at low volume. At high volume, tail-based sampling with error-always rules gives you coverage without the storage cost.</p>
+  </div>
+  <div class="decision-card">
+    <div class="num">05</div>
+    <h4>Context propagation</h4>
+    <p>In a distributed system, trace context must cross service boundaries via HTTP headers (W3C TraceContext). Every service must read and forward these headers.</p>
+  </div>
+  <div class="decision-card">
+    <div class="num">06</div>
+    <h4>Backend choice</h4>
+    <p>OTEL is vendor-neutral. One backend (Grafana Cloud, Datadog) is simplest. Separate backends per signal type is common at platform scale.</p>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Where to go next →</strong>  SDK setup for your language  //  Collector config YAML walkthrough  //  Context propagation in microservices  //  Sampling rule design
+</div>
+
+</body>
+</html>

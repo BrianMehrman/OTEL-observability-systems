@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTEL Signals — Traces, Metrics & Logs</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  header {
+    border-left: 3px solid var(--green);
+    padding-left: 20px;
+    margin-bottom: 48px;
+  }
+  header .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── SIGNAL TABS ── */
+  .signal-tabs { margin-bottom: 40px; }
+  .tab-nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+  .tab-btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px 24px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    color: var(--muted);
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+    border-radius: 5px 5px 0 0;
+    transition: color 0.15s;
+  }
+  .tab-btn.active-traces { color: var(--accent); border-color: var(--border); background: var(--surface); border-bottom-color: var(--surface); }
+  .tab-btn.active-metrics { color: var(--green); border-color: var(--border); background: var(--surface); border-bottom-color: var(--surface); }
+  .tab-btn.active-logs { color: var(--orange); border-color: var(--border); background: var(--surface); border-bottom-color: var(--surface); }
+
+  .tab-panel {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 28px;
+  }
+  .tab-panel.active { display: block; }
+
+  /* ── TRACE DIAGRAM ── */
+  .trace-diagram { margin: 20px 0; }
+  .trace-title { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+  .span-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .span-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 200px;
+    flex-shrink: 0;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .span-label .service-tag {
+    font-size: 10px;
+    color: var(--muted);
+    display: block;
+  }
+  .span-track { flex: 1; height: 24px; background: var(--surface2); border-radius: 3px; position: relative; }
+  .span-bar {
+    position: absolute;
+    top: 3px;
+    height: 18px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .span-duration {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 60px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .span-error .span-bar { outline: 1px solid var(--red); }
+
+  /* ── SPAN ANATOMY ── */
+  .anatomy-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .anatomy-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 16px;
+  }
+  .anatomy-box h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+  .kv { display: flex; flex-direction: column; gap: 4px; }
+  .kv-row { display: flex; gap: 8px; font-family: var(--mono); font-size: 11px; }
+  .kv-key { color: var(--accent); flex-shrink: 0; }
+  .kv-val { color: var(--muted); }
+  .kv-val.ok { color: var(--green); }
+  .kv-val.err { color: var(--red); }
+
+  /* ── METRIC TYPES ── */
+  .metric-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0; }
+  .metric-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 16px;
+  }
+  .metric-card h4 { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--green); margin-bottom: 6px; }
+  .metric-card p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .metric-card .use { font-size: 11px; color: var(--text); }
+  .metric-card .examples { margin-top: 8px; }
+  .metric-card .examples span {
+    font-family: var(--mono);
+    font-size: 10px;
+    display: block;
+    color: var(--muted);
+    padding: 2px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-card .examples span:last-child { border-bottom: none; }
+
+  /* mini bar chart */
+  .mini-chart { display: flex; align-items: flex-end; gap: 3px; height: 40px; margin-top: 10px; }
+  .mini-bar { flex: 1; background: var(--green); border-radius: 2px 2px 0 0; opacity: 0.7; }
+  .mini-line {
+    height: 40px;
+    position: relative;
+    margin-top: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mini-line svg { width: 100%; height: 100%; }
+
+  /* ── LOG ANATOMY ── */
+  .log-entry {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-bottom: 10px;
+    line-height: 1.8;
+  }
+  .log-entry .log-ts { color: var(--muted); }
+  .log-entry .log-sev-info { color: var(--accent); }
+  .log-entry .log-sev-warn { color: var(--orange); }
+  .log-entry .log-sev-err { color: var(--red); }
+  .log-entry .log-msg { color: var(--text); }
+  .log-entry .log-ctx { color: var(--green); }
+  .log-entry .log-trace { color: var(--purple); }
+  .log-entry .log-key { color: var(--accent); }
+  .log-entry .log-comment { color: #334155; }
+
+  .log-before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 20px 0; }
+  .log-before-after .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    border-radius: 3px 3px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+  }
+  .label.before { background: #1f0c0c; color: var(--red); }
+  .label.after  { background: #0c1f10; color: var(--green); }
+
+  /* ── SIGNAL DECISION MATRIX ── */
+  .matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 40px;
+  }
+  .matrix-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    text-align: left;
+    color: var(--muted);
+  }
+  .matrix-table td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--muted);
+    background: var(--surface);
+  }
+  .matrix-table td.signal { font-family: var(--mono); font-weight: 600; }
+  .matrix-table td.signal.t { color: var(--accent); }
+  .matrix-table td.signal.m { color: var(--green); }
+  .matrix-table td.signal.l { color: var(--orange); }
+  .matrix-table tr:hover td { background: var(--surface2); }
+
+  /* ── CORRELATION DIAGRAM ── */
+  .correlation {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 40px;
+  }
+  .corr-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .corr-box {
+    border-radius: 5px;
+    padding: 14px;
+    border: 1px solid var(--border);
+  }
+  .corr-box.trace { background: #0c1f35; border-color: #1a3a5c; }
+  .corr-box.metric { background: #0d2318; border-color: #1a4530; }
+  .corr-box.log   { background: #1f1a08; border-color: #3d3210; }
+  .corr-box h4 { font-family: var(--mono); font-size: 11px; font-weight: 600; margin-bottom: 8px; }
+  .corr-box.trace h4 { color: var(--accent); }
+  .corr-box.metric h4 { color: var(--green); }
+  .corr-box.log h4 { color: var(--orange); }
+  .corr-box p { font-size: 11px; color: var(--muted); }
+  .corr-link {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--purple);
+    padding: 6px;
+    background: #150d2a;
+    border: 1px solid #2d1a5c;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+
+  .note {
+    background: #0c1f10;
+    border: 1px solid #1a4025;
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-size: 12px;
+    color: #86efac;
+    font-family: var(--mono);
+  }
+  .note strong { color: var(--green); }
+
+  @media (max-width: 700px) {
+    .anatomy-grid, .metric-types, .log-before-after, .corr-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// 02 — The Three Signals</div>
+  <h1>Traces, Metrics &amp; Logs<br>— what each one is for</h1>
+  <p>All three signals are complementary. You need all three to fully understand a production system. This section covers what each one captures, when to use it, and how they connect to each other.</p>
+</header>
+
+<!-- SIGNAL TABS -->
+<div class="section-label">Deep Dive Per Signal</div>
+<div class="signal-tabs">
+  <div class="tab-nav">
+    <button class="tab-btn active-traces" onclick="showTab('traces', this)">① Traces</button>
+    <button class="tab-btn" onclick="showTab('metrics', this)">② Metrics</button>
+    <button class="tab-btn" onclick="showTab('logs', this)">③ Logs</button>
+  </div>
+
+  <!-- TRACES PANEL -->
+  <div id="tab-traces" class="tab-panel active">
+    <p style="color:var(--muted);font-size:13px;margin-bottom:4px;">A trace tracks a <strong style="color:var(--text)">single request</strong> as it flows through your system. It answers: <em>"Where did this request go, how long did each step take, and where did it fail?"</em></p>
+
+    <div class="trace-diagram">
+      <div class="trace-title">Example: POST /checkout — trace across 4 services (total 412ms)</div>
+
+      <div class="span-row">
+        <div class="span-label">api-gateway<span class="service-tag">root span</span></div>
+        <div class="span-track">
+          <div class="span-bar" style="left:0%;width:100%;background:#1a3a6e;">POST /checkout  412ms</div>
+        </div>
+        <div class="span-duration">412ms</div>
+      </div>
+
+      <div class="span-row" style="padding-left:20px">
+        <div class="span-label">order-service<span class="service-tag">child span</span></div>
+        <div class="span-track">
+          <div class="span-bar" style="left:2%;width:90%;background:#1a4a6e;">createOrder()  370ms</div>
+        </div>
+        <div class="span-duration">370ms</div>
+      </div>
+
+      <div class="span-row" style="padding-left:40px">
+        <div class="span-label">postgres<span class="service-tag">db span</span></div>
+        <div class="span-track">
+          <div class="span-bar" style="left:4%;width:30%;background:#0d3d2a;">INSERT orders  122ms</div>
+        </div>
+        <div class="span-duration">122ms</div>
+      </div>
+
+      <div class="span-row" style="padding-left:40px">
+        <div class="span-label">payment-service<span class="service-tag">child span</span></div>
+        <div class="span-track">
+          <div class="span-bar" style="left:38%;width:54%;background:#3d1a1a;">charge()  220ms</div>
+        </div>
+        <div class="span-duration">220ms</div>
+      </div>
+
+      <div class="span-row span-error" style="padding-left:60px">
+        <div class="span-label">stripe-api<span class="service-tag">external span ⚠</span></div>
+        <div class="span-track">
+          <div class="span-bar" style="left:40%;width:50%;background:#4a1a1a;outline:1px solid #ef4444;">HTTP POST /charge  204ms  ERROR</div>
+        </div>
+        <div class="span-duration" style="color:var(--red)">204ms</div>
+      </div>
+    </div>
+
+    <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">The diagram above shows a waterfall view. The root span is the full request. Child spans are nested operations. You can immediately see that the Stripe call is the slowest step and the source of the error.</p>
+
+    <div class="anatomy-grid">
+      <div class="anatomy-box">
+        <h4>Span — required fields</h4>
+        <div class="kv">
+          <div class="kv-row"><span class="kv-key">trace_id</span><span class="kv-val">abc123…  (same for all spans in trace)</span></div>
+          <div class="kv-row"><span class="kv-key">span_id</span><span class="kv-val">f9a2b1…  (unique per span)</span></div>
+          <div class="kv-row"><span class="kv-key">parent_span_id</span><span class="kv-val">d3e4c5…  (null if root)</span></div>
+          <div class="kv-row"><span class="kv-key">name</span><span class="kv-val">POST /checkout</span></div>
+          <div class="kv-row"><span class="kv-key">start_time</span><span class="kv-val">2024-03-01T10:00:00.000Z</span></div>
+          <div class="kv-row"><span class="kv-key">end_time</span><span class="kv-val">2024-03-01T10:00:00.412Z</span></div>
+          <div class="kv-row"><span class="kv-key">status</span><span class="kv-val err">ERROR</span></div>
+        </div>
+      </div>
+      <div class="anatomy-box">
+        <h4>Span — common attributes</h4>
+        <div class="kv">
+          <div class="kv-row"><span class="kv-key">http.method</span><span class="kv-val">POST</span></div>
+          <div class="kv-row"><span class="kv-key">http.status_code</span><span class="kv-val err">402</span></div>
+          <div class="kv-row"><span class="kv-key">http.url</span><span class="kv-val">https://api.stripe.com/charge</span></div>
+          <div class="kv-row"><span class="kv-key">db.system</span><span class="kv-val">postgresql</span></div>
+          <div class="kv-row"><span class="kv-key">db.statement</span><span class="kv-val">INSERT INTO orders…</span></div>
+          <div class="kv-row"><span class="kv-key">service.name</span><span class="kv-val">payment-service</span></div>
+          <div class="kv-row"><span class="kv-key">service.version</span><span class="kv-val">2.4.1</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;font-size:12px;">
+      <strong style="font-family:var(--mono);color:var(--accent)">When to add a manual span:</strong>
+      <span style="color:var(--muted)"> Auto-instrumentation covers HTTP calls, DB queries, and queue operations. Add manual spans when you want visibility into business logic — e.g. </span>
+      <span style="font-family:var(--mono);color:var(--text)">validatePromoCode()</span>
+      <span style="color:var(--muted)">, </span>
+      <span style="font-family:var(--mono);color:var(--text)">calculateTax()</span>
+      <span style="color:var(--muted)">, or anything that takes meaningful time or can fail.</span>
+    </div>
+  </div>
+
+  <!-- METRICS PANEL -->
+  <div id="tab-metrics" class="tab-panel">
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">Metrics are <strong style="color:var(--text)">numbers collected over time</strong>. They're cheap to store, fast to query, and ideal for dashboards and alerting. They answer: <em>"Is the system healthy right now?"</em></p>
+
+    <div class="metric-types">
+      <div class="metric-card">
+        <h4>Counter</h4>
+        <p>A value that only ever goes up. Reset to zero on restart.</p>
+        <div class="use">Use for: totals and rates</div>
+        <div class="examples">
+          <span>http.server.request.count</span>
+          <span>db.query.count</span>
+          <span>errors.total</span>
+          <span>messages.published</span>
+        </div>
+        <div class="mini-chart">
+          <div class="mini-bar" style="height:20%"></div>
+          <div class="mini-bar" style="height:35%"></div>
+          <div class="mini-bar" style="height:45%"></div>
+          <div class="mini-bar" style="height:55%"></div>
+          <div class="mini-bar" style="height:60%"></div>
+          <div class="mini-bar" style="height:75%"></div>
+          <div class="mini-bar" style="height:80%"></div>
+          <div class="mini-bar" style="height:90%"></div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <h4>Gauge</h4>
+        <p>Current value at a point in time. Can go up or down.</p>
+        <div class="use">Use for: current state</div>
+        <div class="examples">
+          <span>db.pool.connections.active</span>
+          <span>queue.messages.pending</span>
+          <span>memory.heap.used</span>
+          <span>cpu.utilization</span>
+        </div>
+        <div class="mini-chart">
+          <div class="mini-bar" style="height:60%;background:#3ecf8e"></div>
+          <div class="mini-bar" style="height:75%;background:#3ecf8e"></div>
+          <div class="mini-bar" style="height:50%;background:#3ecf8e"></div>
+          <div class="mini-bar" style="height:90%;background:#f59e0b"></div>
+          <div class="mini-bar" style="height:85%;background:#f59e0b"></div>
+          <div class="mini-bar" style="height:40%;background:#3ecf8e"></div>
+          <div class="mini-bar" style="height:55%;background:#3ecf8e"></div>
+          <div class="mini-bar" style="height:65%;background:#3ecf8e"></div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <h4>Histogram</h4>
+        <p>Samples observations into configurable buckets.</p>
+        <div class="use">Use for: latency percentiles</div>
+        <div class="examples">
+          <span>http.server.request.duration</span>
+          <span>db.query.duration</span>
+          <span>message.processing.time</span>
+          <span>cache.lookup.duration</span>
+        </div>
+        <div class="mini-chart">
+          <div class="mini-bar" style="height:90%;background:#4f9cf9"></div>
+          <div class="mini-bar" style="height:70%;background:#4f9cf9"></div>
+          <div class="mini-bar" style="height:50%;background:#4f9cf9"></div>
+          <div class="mini-bar" style="height:30%;background:#4f9cf9"></div>
+          <div class="mini-bar" style="height:20%;background:#4f9cf9"></div>
+          <div class="mini-bar" style="height:10%;background:#4f9cf9"></div>
+          <div class="mini-bar" style="height:5%;background:#ef4444"></div>
+          <div class="mini-bar" style="height:3%;background:#ef4444"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:16px;margin-top:4px;">
+      <div style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);margin-bottom:10px;">Attributes (dimensions) — what makes metrics powerful</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Without attributes, a metric like <code style="font-family:var(--mono)">http.request.duration</code> is a single number. With attributes, you can slice it by service, endpoint, status code, region — turning one metric into thousands of specific answers.</p>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">http.request.duration</span><span class="kv-val">{service="order-service", method="POST", status="200", region="eu-west"}</span></div>
+        <div class="kv-row"><span class="kv-key">http.request.duration</span><span class="kv-val">{service="order-service", method="POST", status="500", region="eu-west"}</span></div>
+        <div class="kv-row"><span class="kv-key">http.request.duration</span><span class="kv-val">{service="payment-service", method="POST", status="402", region="us-east"}</span></div>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
+        <strong style="color:var(--orange)">Cardinality warning:</strong> High-cardinality attributes (user IDs, request IDs) will create millions of unique time series and can overload a metrics backend. Use traces for high-cardinality data. Use metrics for low-cardinality dimensions only.
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGS PANEL -->
+  <div id="tab-logs" class="tab-panel">
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">Logs are <strong style="color:var(--text)">timestamped, structured records</strong> of events. You almost certainly have them already. OTEL's contribution is adding trace context — so a log entry can be linked back to the exact request that produced it.</p>
+
+    <div class="log-before-after">
+      <div>
+        <div class="label before">Without OTEL context</div>
+        <div class="log-entry" style="border-radius:0 0 5px 5px;border-top:none;">
+          <span class="log-ts">2024-03-01 10:00:00.320</span> <span class="log-sev-err">[ERROR]</span> <span class="log-msg">Payment charge failed: card_declined</span><br>
+          <span class="log-ts">2024-03-01 10:00:00.321</span> <span class="log-sev-err">[ERROR]</span> <span class="log-msg">Returning 402 to client</span><br>
+          <br>
+          <span class="log-comment">// Which user? Which request? Which trace?</span><br>
+          <span class="log-comment">// You have no way to connect this to other</span><br>
+          <span class="log-comment">// logs or to the trace that caused it.</span>
+        </div>
+      </div>
+      <div>
+        <div class="label after">With OTEL context</div>
+        <div class="log-entry" style="border-radius:0 0 5px 5px;border-top:none;">
+          <span class="log-ts">2024-03-01T10:00:00.320Z</span> <span class="log-sev-err">ERROR</span><br>
+          <span class="log-key">message:</span> <span class="log-msg">"Payment charge failed: card_declined"</span><br>
+          <span class="log-key">service.name:</span> <span class="log-ctx">"payment-service"</span><br>
+          <span class="log-key">trace_id:</span> <span class="log-trace">abc123def456…</span><br>
+          <span class="log-key">span_id:</span>  <span class="log-trace">f9a2b1c3…</span><br>
+          <span class="log-key">user_id:</span>  <span class="log-ctx">"usr_8821"</span><br>
+          <span class="log-key">order_id:</span> <span class="log-ctx">"ord_4492"</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">The <span style="font-family:var(--mono);color:var(--purple)">trace_id</span> and <span style="font-family:var(--mono);color:var(--purple)">span_id</span> in the log entry are the same values present in the trace. Any observability backend with log-trace correlation can jump directly from this log entry to the full request waterfall.</p>
+
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:16px;">
+      <div style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);margin-bottom:10px;">Severity levels — use them consistently</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <div style="text-align:center;padding:8px;background:var(--bg);border-radius:3px;border:1px solid var(--border);">
+          <div style="font-family:var(--mono);font-size:12px;color:#94a3b8;">DEBUG</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Dev only. Never in prod.</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg);border-radius:3px;border:1px solid var(--border);">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--accent);">INFO</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Normal operations.</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg);border-radius:3px;border:1px solid var(--border);">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--orange);">WARN</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Unexpected but handled.</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg);border-radius:3px;border:1px solid var(--border);">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--red);">ERROR</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Needs attention.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DECISION MATRIX -->
+<div class="section-label">When to Use Which Signal</div>
+<table class="matrix-table" style="margin-bottom:40px;">
+  <thead>
+    <tr>
+      <th>Signal</th>
+      <th>Question it answers</th>
+      <th>Strengths</th>
+      <th>Limitations</th>
+      <th>Good example use cases</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="signal t">Traces</td>
+      <td>Why was this request slow or broken?</td>
+      <td>Full request context, causality, timing across services</td>
+      <td>High volume = high cost. Can't aggregate across many requests easily</td>
+      <td>Debugging a slow API call, finding which service in a chain errored</td>
+    </tr>
+    <tr>
+      <td class="signal m">Metrics</td>
+      <td>Is the system healthy right now?</td>
+      <td>Cheap, fast, aggregatable, great for alerting</td>
+      <td>No per-request context. High cardinality kills performance</td>
+      <td>p99 latency dashboards, error rate alerts, capacity planning</td>
+    </tr>
+    <tr>
+      <td class="signal l">Logs</td>
+      <td>What exactly happened during an event?</td>
+      <td>Rich detail, free-form, already familiar to developers</td>
+      <td>Expensive at high volume. Hard to query without structure</td>
+      <td>Reading the exact error message and stack trace for a failed request</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- CORRELATION -->
+<div class="section-label">How the Three Signals Connect</div>
+<div class="correlation">
+  <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">The real power of OTEL comes from linking all three signals around the same <strong style="color:var(--purple)">trace_id</strong>. A single incident investigation flow typically moves through all three.</p>
+
+  <div class="corr-row">
+    <div class="corr-box metric">
+      <h4>① Metric fires an alert</h4>
+      <p><code style="font-family:var(--mono)">error.rate &gt; 5%</code> triggers a PagerDuty alert at 10:03am. You know something is wrong but not what.</p>
+    </div>
+    <div class="corr-box trace">
+      <h4>② Traces reveal the cause</h4>
+      <p>Filter traces by <code style="font-family:var(--mono)">status=ERROR</code> in the 10:00–10:05 window. The waterfall shows the Stripe span failing at 200ms for 12% of requests.</p>
+    </div>
+    <div class="corr-box log">
+      <h4>③ Logs give the detail</h4>
+      <p>Click the failing span's <code style="font-family:var(--mono)">trace_id</code> to jump to correlated logs. The log message reads: <em>"card_declined: insufficient_funds"</em>.</p>
+    </div>
+  </div>
+
+  <div class="corr-link">trace_id ties all three together — one value links metric → trace → log</div>
+
+  <div style="font-size:12px;color:var(--muted);">
+    This workflow — <strong style="color:var(--text)">alert on metrics, investigate with traces, read the detail in logs</strong> — is the standard OTEL investigation pattern. It only works when context propagation is set up correctly (covered in Section 05).
+  </div>
+</div>
+
+<div class="note">
+  <strong>Where to go next →</strong>  03 — The Collector (config YAML, pipeline processing)  //  04 — Sampling (controlling volume)  //  05 — Distributed tracing &amp; context propagation
+</div>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.className = 'tab-btn';
+  });
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active-' + name);
+}
+</script>
+</body>
+</html>
