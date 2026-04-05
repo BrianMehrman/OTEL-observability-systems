@@ -202,7 +202,10 @@ Purely scheduled jobs (cron-style, no triggering request) start new root spans. 
 
 ## What's Next
 
-The five core sections are complete. The next phase adds:
-- **06 — Ecosystem** — Backend tools, SaaS platforms, and OSS stack recommendations per scale tier
-- **07 — Language SDKs** — Setup guides for Python, Node.js, Go, Java
-- **08 — Kubernetes** — OTEL Operator, DaemonSet deployment, cert-manager integration
+- **[06 — Ecosystem](otel-ecosystem.md)** — Backend tools, SaaS platforms, and OSS stack recommendations per scale tier
+- **[07 — Language SDKs](otel-sdks.md)** — Setup guides for Python, Node.js, Go, Java
+- **[08 — Kubernetes](otel-kubernetes.md)** — OTEL Operator, DaemonSet deployment, cert-manager integration
+
+---
+
+[← Back to Guide Index](otel-overview.md)

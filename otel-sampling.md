@@ -222,4 +222,8 @@ tail_sampling:
 
 ## What's Next
 
-- **[05 — Distributed Tracing]** — How trace context crosses service boundaries, W3C propagation, and correlating traces across languages and frameworks
+- **[05 — Distributed Tracing](otel-distributed.md)** — How trace context crosses service boundaries, W3C propagation, and correlating traces across languages and frameworks
+
+---
+
+[← Back to Guide Index](otel-overview.md)

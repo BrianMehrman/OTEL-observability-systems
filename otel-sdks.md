@@ -459,4 +459,9 @@ try (var scope = span.makeCurrent()) {
 
 ## What's Next
 
-- **[08 — Kubernetes]** — Deploying the OTEL Operator, auto-injecting instrumentation via pod annotations, and scaling the Collector in a cluster
+- **[08 — Kubernetes](otel-kubernetes.md)** — Deploying the OTEL Operator, auto-injecting instrumentation via pod annotations, and scaling the Collector in a cluster
+- **[09 — Tools Reference](otel-tools.md)** — Instrumentation library and backend comparison tables
+
+---
+
+[← Back to Guide Index](otel-overview.md)

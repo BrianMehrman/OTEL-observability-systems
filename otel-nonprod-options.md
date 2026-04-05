@@ -386,3 +386,14 @@ services:
       # Production (via OTEL Collector → Datadog):
       # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
 ```
+
+---
+
+## Related Guides
+
+- **[Rails Stack Analysis](otel-rails-stack.md)** — Options A/B/C for the Rails pipeline
+- **[Migration Plan](otel-migration-plan.md)** — Phase-by-phase migration plan
+- **[Distributed System Migration](otel-distributed-migration.md)** — Full polyglot stack migration guide
+- **[03 — Collector](otel-collector.md)** — OTEL Collector pipeline and config reference
+
+[← Back to Guide Index](otel-overview.md)
