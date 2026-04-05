@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Distributed System OTEL Migration Guide</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:       #0a0d14;
+      --surface:  #111520;
+      --surface2: #181e2e;
+      --border:   #232b40;
+      --accent:   #2dd4bf;   /* teal — distributed systems */
+      --blue:     #4f9cf9;
+      --green:    #3ecf8e;
+      --orange:   #f59e0b;
+      --red:      #ef4444;
+      --purple:   #a78bfa;
+      --yellow:   #fcd34d;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      padding: 0 0 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #0a1a1a 0%, #0a2020 50%, #0a1a2a 100%);
+      border-bottom: 1px solid var(--accent);
+      padding: 48px 40px 36px;
+    }
+    header .badge {
+      display: inline-block;
+      background: rgba(45,212,191,.15);
+      border: 1px solid rgba(45,212,191,.4);
+      color: var(--accent);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+      letter-spacing: .08em;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+    header h1 span { color: var(--accent); }
+    header p {
+      color: #94a3b8;
+      max-width: 700px;
+      font-size: 15px;
+    }
+    .stack-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .stack-tag {
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--muted);
+    }
+    .stack-tag.hl { color: var(--accent); border-color: rgba(45,212,191,.3); }
+
+    /* ── Nav ── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 40px;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    nav a:hover { color: var(--accent); }
+
+    /* ── Layout ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 40px; }
+    section { margin-bottom: 56px; }
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 24px;
+    }
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--yellow);
+      margin: 28px 0 12px;
+    }
+    h4 {
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--blue);
+      margin: 20px 0 8px;
+    }
+    p { margin-bottom: 14px; color: #cbd5e1; }
+    ul { margin: 10px 0 16px 20px; }
+    li { margin-bottom: 6px; color: #cbd5e1; }
+    strong { color: var(--text); }
+
+    /* ── Cards ── */
+    .card-grid {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 22px;
+    }
+    .card.accent-border { border-left: 3px solid var(--accent); }
+    .card.green-border  { border-left: 3px solid var(--green); }
+    .card.orange-border { border-left: 3px solid var(--orange); }
+    .card.red-border    { border-left: 3px solid var(--red); }
+    .card.purple-border { border-left: 3px solid var(--purple); }
+    .card.blue-border   { border-left: 3px solid var(--blue); }
+    .card h3 { margin-top: 0; }
+
+    /* ── Architecture Diagram ── */
+    .arch-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 28px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .arch-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .svc-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      min-width: 130px;
+    }
+    .svc-box .lang { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .svc-box .plat { font-size: 10px; margin-top: 3px; }
+    .svc-box.ruby   { border-color: var(--red);   }
+    .svc-box.java   { border-color: var(--orange);}
+    .svc-box.node   { border-color: var(--green); }
+    .svc-box.broker { border-color: var(--purple);}
+    .svc-box.aws    { border-color: var(--yellow);}
+    .svc-box.data   { border-color: var(--accent);}
+    .arrow { color: var(--muted); font-size: 16px; flex-shrink: 0; }
+
+    /* ── Status Badges ── */
+    .badge-pill {
+      display: inline-block;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 600;
+    }
+    .badge-red    { background: rgba(239,68,68,.15);  color: var(--red);    border: 1px solid rgba(239,68,68,.3);  }
+    .badge-yellow { background: rgba(252,211,77,.15); color: var(--yellow); border: 1px solid rgba(252,211,77,.3); }
+    .badge-green  { background: rgba(62,207,142,.15); color: var(--green);  border: 1px solid rgba(62,207,142,.3); }
+    .badge-blue   { background: rgba(79,156,249,.15); color: var(--blue);   border: 1px solid rgba(79,156,249,.3); }
+    .badge-muted  { background: rgba(100,116,139,.1); color: var(--muted);  border: 1px solid var(--border);        }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      color: #cbd5e1;
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+    td:first-child { font-family: 'IBM Plex Mono', monospace; color: var(--text); }
+
+    /* ── Code Blocks ── */
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 18px 20px;
+      overflow-x: auto;
+      margin: 14px 0;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+    .y-key     { color: var(--blue); }
+    .y-val     { color: var(--green); }
+    .y-str     { color: var(--yellow); }
+    .y-comment { color: #475569; font-style: italic; }
+    .y-section { color: var(--orange); font-weight: 600; }
+    .r-kw      { color: var(--purple); }
+    .r-str     { color: var(--yellow); }
+    .r-comment { color: #475569; font-style: italic; }
+    .r-const   { color: var(--orange); }
+    .r-method  { color: var(--blue); }
+    .sh-cmd    { color: var(--green); }
+    .sh-flag   { color: var(--accent); }
+    .sh-val    { color: var(--yellow); }
+    .sh-comment{ color: #475569; font-style: italic; }
+    .j-kw      { color: var(--purple); }
+    .j-str     { color: var(--yellow); }
+    .j-fn      { color: var(--blue); }
+    .j-comment { color: #475569; font-style: italic; }
+
+    /* ── Phase Roadmap ── */
+    .phase-list { display: flex; flex-direction: column; gap: 16px; }
+    .phase-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .phase-num {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 16px;
+      flex-shrink: 0;
+    }
+    .p1 { background: rgba(45,212,191,.15); color: var(--accent); border: 2px solid var(--accent); }
+    .p2 { background: rgba(62,207,142,.15); color: var(--green);  border: 2px solid var(--green); }
+    .p3 { background: rgba(79,156,249,.15); color: var(--blue);   border: 2px solid var(--blue); }
+    .p4 { background: rgba(252,211,77,.15); color: var(--yellow); border: 2px solid var(--yellow); }
+    .p5 { background: rgba(167,139,250,.15);color: var(--purple); border: 2px solid var(--purple); }
+    .p6 { background: rgba(245,158,11,.15); color: var(--orange); border: 2px solid var(--orange); }
+    .phase-content h3 { margin-top: 0; font-size: 15px; }
+    .phase-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--muted);
+    }
+
+    /* ── Env routing ── */
+    .env-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+    .env-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .env-card .env-label {
+      font-size: 11px;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+    .env-card .env-name {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      margin-bottom: 6px;
+      color: #94a3b8;
+    }
+    .flow-arrow .from { color: var(--text); }
+    .flow-arrow .to   { padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .to-dd   { background: rgba(99,102,241,.2); color: #818cf8; }
+    .to-sig  { background: rgba(62,207,142,.15); color: var(--green); }
+    .to-none { background: rgba(100,116,139,.1); color: var(--muted); }
+
+    /* ── Callout ── */
+    .callout {
+      background: var(--surface2);
+      border-left: 3px solid var(--orange);
+      padding: 14px 18px;
+      border-radius: 0 6px 6px 0;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .callout.info   { border-color: var(--blue); }
+    .callout.warn   { border-color: var(--orange); }
+    .callout.danger { border-color: var(--red); }
+    .callout.tip    { border-color: var(--green); }
+    .callout strong { display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">DISTRIBUTED SYSTEM MIGRATION</div>
+  <h1>Distributed System <span>OTEL Migration</span></h1>
+  <p>A practical guide for migrating a real polyglot distributed system from
+     Datadog-inferred tracing to explicit OpenTelemetry instrumentation across all services,
+     while routing non-production environments to cost-effective OSS backends.</p>
+  <div class="stack-tags">
+    <span class="stack-tag hl">Ruby on Rails</span>
+    <span class="stack-tag hl">Sidekiq Enterprise</span>
+    <span class="stack-tag hl">Java Microservices</span>
+    <span class="stack-tag hl">Node.js APIs</span>
+    <span class="stack-tag">RabbitMQ</span>
+    <span class="stack-tag">Kafka</span>
+    <span class="stack-tag">Redis</span>
+    <span class="stack-tag">AWS SNS / SQS</span>
+    <span class="stack-tag">EC2 + Kubernetes</span>
+    <span class="stack-tag">Datadog → SigNoz</span>
+  </div>
+</header>
+
+<nav>
+  <a href="#architecture">Architecture</a>
+  <a href="#inventory">Inventory</a>
+  <a href="#inference">DD Inference</a>
+  <a href="#ruby">Ruby SDK</a>
+  <a href="#java">Java SDK</a>
+  <a href="#nodejs">Node.js SDK</a>
+  <a href="#messaging">Messaging</a>
+  <a href="#collector">Collector</a>
+  <a href="#envs">Environments</a>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#gains">What You Gain</a>
+</nav>
+
+<main>
+
+<!-- ══ Architecture ══ -->
+<section id="architecture">
+  <h2>Current Architecture</h2>
+
+  <div class="arch-box">
+    <div style="color:#64748b;font-size:11px;margin-bottom:18px;">
+      COLOR KEY: <span style="color:var(--red)">■ Ruby</span>&nbsp;&nbsp;
+      <span style="color:var(--orange)">■ Java</span>&nbsp;&nbsp;
+      <span style="color:var(--green)">■ Node.js</span>&nbsp;&nbsp;
+      <span style="color:var(--purple)">■ Message Broker</span>&nbsp;&nbsp;
+      <span style="color:var(--yellow)">■ AWS Managed</span>&nbsp;&nbsp;
+      <span style="color:var(--accent)">■ Data</span>
+    </div>
+
+    <!-- Tier 1: User -->
+    <div class="arch-row" style="justify-content:center;">
+      <div class="svc-box" style="background:rgba(255,255,255,.04);border-color:#334155;width:280px;">
+        <strong>User Requests (HTTPS)</strong>
+        <div class="lang">Internet</div>
+      </div>
+    </div>
+    <div class="arch-row" style="justify-content:center;"><span class="arrow">↓</span></div>
+
+    <!-- Tier 2: Rails Web -->
+    <div class="arch-row" style="justify-content:center;gap:24px;">
+      <div class="svc-box ruby" style="width:220px;">
+        <strong>Rails Web Server</strong>
+        <div class="lang">Ruby / Puma</div>
+        <div class="plat"><span class="badge-pill badge-muted">EC2 / K8s</span></div>
+      </div>
+    </div>
+    <div class="arch-row" style="justify-content:center;gap:60px;">
+      <span class="arrow">↙</span>
+      <span class="arrow">↓</span>
+      <span class="arrow">↘</span>
+    </div>
+
+    <!-- Tier 3: Gateway, Sidekiq, SNS/SQS -->
+    <div class="arch-row" style="justify-content:center;gap:20px;">
+      <div class="svc-box java">
+        <strong>API Gateway</strong>
+        <div class="lang">Java / Spring</div>
+        <div class="plat"><span class="badge-pill badge-muted">EC2 / K8s</span></div>
+      </div>
+      <div class="svc-box ruby">
+        <strong>Sidekiq Jobs</strong>
+        <div class="lang">Ruby Enterprise</div>
+        <div class="plat"><span class="badge-pill badge-muted">EC2 / K8s</span></div>
+      </div>
+      <div class="svc-box aws">
+        <strong>SNS / SQS</strong>
+        <div class="lang">AWS Managed</div>
+        <div class="plat"><span class="badge-pill badge-muted">AWS</span></div>
+      </div>
+    </div>
+    <div class="arch-row" style="justify-content:center;gap:40px;">
+      <span class="arrow">↓ HTTP/gRPC</span>
+      <span class="arrow">↔ Redis</span>
+      <span class="arrow">↓</span>
+    </div>
+
+    <!-- Tier 4: Microservices -->
+    <div class="arch-row" style="justify-content:center;gap:16px;flex-wrap:wrap;">
+      <div class="svc-box java">
+        <strong>Java Service</strong>
+        <div class="lang">Spring Boot</div>
+        <div class="plat"><span class="badge-pill badge-muted">K8s</span></div>
+      </div>
+      <div class="svc-box java">
+        <strong>Java Service</strong>
+        <div class="lang">Spring Boot</div>
+        <div class="plat"><span class="badge-pill badge-muted">K8s</span></div>
+      </div>
+      <div class="svc-box java">
+        <strong>Java Snowflake API</strong>
+        <div class="lang">Java</div>
+        <div class="plat"><span class="badge-pill badge-muted">K8s / EC2</span></div>
+      </div>
+      <div class="svc-box node">
+        <strong>Node.js Snowflake API</strong>
+        <div class="lang">Node.js</div>
+        <div class="plat"><span class="badge-pill badge-muted">K8s / EC2</span></div>
+      </div>
+    </div>
+    <div class="arch-row" style="justify-content:center;"><span class="arrow">↓</span></div>
+
+    <!-- Data + Brokers row -->
+    <div class="arch-row" style="justify-content:center;gap:20px;">
+      <div class="svc-box data">
+        <strong>Snowflake</strong>
+        <div class="lang">Data Warehouse</div>
+      </div>
+      <div class="svc-box broker">
+        <strong>RabbitMQ</strong>
+        <div class="lang">AMQP Broker</div>
+        <div class="plat"><span class="badge-pill badge-muted">EC2</span></div>
+      </div>
+      <div class="svc-box broker">
+        <strong>Kafka</strong>
+        <div class="lang">Event Stream</div>
+        <div class="plat"><span class="badge-pill badge-muted">EC2 / MSK</span></div>
+      </div>
+      <div class="svc-box broker" style="border-color:var(--accent);">
+        <strong>Redis</strong>
+        <div class="lang">Cache / Queues</div>
+        <div class="plat"><span class="badge-pill badge-muted">Managed</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
+      <span style="color:var(--muted);font-size:11px;">CURRENT OBSERVABILITY: </span>
+      <span style="color:var(--red);font-size:12px;">All environments → Datadog agent → Datadog (logs + partial APM)</span>
+      &nbsp;&nbsp;
+      <span style="color:var(--orange);font-size:12px;">⚠ Some traces inferred from log correlation, not explicitly instrumented</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Inventory ══ -->
+<section id="inventory">
+  <h2>Observability Inventory</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Language</th>
+          <th>Platform</th>
+          <th>Explicit Tracing</th>
+          <th>Log Routing</th>
+          <th>Migration Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Rails Web Server</td>
+          <td>Ruby</td>
+          <td>EC2 / K8s</td>
+          <td><span class="badge-pill badge-red">DD-inferred</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-red">🔴 High</span></td>
+        </tr>
+        <tr>
+          <td>Sidekiq Enterprise</td>
+          <td>Ruby</td>
+          <td>EC2 / K8s</td>
+          <td><span class="badge-pill badge-red">DD-inferred</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-red">🔴 High</span></td>
+        </tr>
+        <tr>
+          <td>API Gateway</td>
+          <td>Java</td>
+          <td>EC2 / K8s</td>
+          <td><span class="badge-pill badge-yellow">Partial</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-yellow">🟡 Medium</span></td>
+        </tr>
+        <tr>
+          <td>Java Services (×n)</td>
+          <td>Java</td>
+          <td>Kubernetes</td>
+          <td><span class="badge-pill badge-yellow">Partial DD APM</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-yellow">🟡 Medium</span></td>
+        </tr>
+        <tr>
+          <td>Java Snowflake API</td>
+          <td>Java</td>
+          <td>K8s / EC2</td>
+          <td><span class="badge-pill badge-red">None</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-yellow">🟡 Medium</span></td>
+        </tr>
+        <tr>
+          <td>Node.js Snowflake API</td>
+          <td>Node.js</td>
+          <td>K8s / EC2</td>
+          <td><span class="badge-pill badge-red">None</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-yellow">🟡 Medium</span></td>
+        </tr>
+        <tr>
+          <td>RabbitMQ</td>
+          <td>—</td>
+          <td>EC2</td>
+          <td><span class="badge-pill badge-muted">Broker (propagation)</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-blue">Phase 5</span></td>
+        </tr>
+        <tr>
+          <td>Kafka</td>
+          <td>—</td>
+          <td>EC2 / MSK</td>
+          <td><span class="badge-pill badge-muted">Broker (propagation)</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-blue">Phase 5</span></td>
+        </tr>
+        <tr>
+          <td>Redis</td>
+          <td>—</td>
+          <td>Managed</td>
+          <td><span class="badge-pill badge-muted">N/A</span></td>
+          <td>Datadog</td>
+          <td><span class="badge-pill badge-muted">N/A</span></td>
+        </tr>
+        <tr>
+          <td>SNS / SQS</td>
+          <td>—</td>
+          <td>AWS Managed</td>
+          <td><span class="badge-pill badge-muted">Propagation only</span></td>
+          <td>AWS</td>
+          <td><span class="badge-pill badge-blue">Phase 5</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ DD Inference ══ -->
+<section id="inference">
+  <h2>What Datadog's Inference Does (and What You Must Replace)</h2>
+
+  <div class="callout danger">
+    <strong>⚠ Critical Risk</strong>
+    Services with no OTEL instrumentation become completely invisible in SigNoz and Grafana.
+    The service map only shows services that <em>emit spans</em>. Never decommission Datadog
+    for a service until that service has explicit OTEL instrumentation.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Inference Method</th>
+          <th>How Datadog Does It</th>
+          <th>What You Lose Without It</th>
+          <th>OTEL Replacement</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Log correlation</td>
+          <td>Injects dd.trace_id into log lines; correlates across services</td>
+          <td>Trace ↔ log linking</td>
+          <td>OTEL SDK injects trace_id into structured logs</td>
+        </tr>
+        <tr>
+          <td>APM header passthrough</td>
+          <td>x-datadog-* headers pass through uninstrumented services</td>
+          <td>Request continuity across hops</td>
+          <td>Explicit traceparent header propagation per service</td>
+        </tr>
+        <tr>
+          <td>Network Performance Monitoring</td>
+          <td>Tracks TCP connections between hosts to infer topology</td>
+          <td>Service map edges for uninstrumented services</td>
+          <td>Explicit spans per service (no equivalent inference)</td>
+        </tr>
+        <tr>
+          <td>Service Entry Inference</td>
+          <td>Infers service entry points from network + log metadata</td>
+          <td>Automatic service discovery</td>
+          <td>service.name resource attribute on every OTEL span</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <strong>💡 Strategy</strong>
+    Run OTEL instrumentation in parallel with Datadog agents for 1–2 weeks per service.
+    Compare the two views. Only remove the Datadog agent when you're confident OTEL
+    coverage is equal or better.
+  </div>
+</section>
+
+<!-- ══ Ruby SDK ══ -->
+<section id="ruby">
+  <h2>Ruby: Rails + Sidekiq Instrumentation</h2>
+
+  <div class="card-grid">
+    <div class="card ruby-border" style="border-left-color:var(--red);">
+      <h3 style="color:var(--red);">Rails Web Server</h3>
+      <p style="font-size:13px;">Auto-instruments Puma, Rack, Rails MVC, ActiveRecord, Net::HTTP, Faraday, and all outbound HTTP calls.</p>
+      <div class="phase-chips">
+        <span class="chip">opentelemetry-sdk</span>
+        <span class="chip">instrumentation-rails</span>
+        <span class="chip">instrumentation-active_record</span>
+      </div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--red);">
+      <h3 style="color:var(--red);">Sidekiq Enterprise</h3>
+      <p style="font-size:13px;">Creates producer span on enqueue, consumer span on processing. Trace context stored in job metadata in Redis.</p>
+      <div class="phase-chips">
+        <span class="chip">instrumentation-sidekiq</span>
+        <span class="chip">instrumentation-redis</span>
+        <span class="chip">instrumentation-bunny</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Gemfile</h3>
+  <pre><span class="r-comment"># Gemfile</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-sdk'</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-exporter-otlp'</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-instrumentation-rails'</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-instrumentation-active_record'</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-instrumentation-rack'</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-instrumentation-sidekiq'</span>    <span class="r-comment"># enqueue + process spans</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-instrumentation-redis'</span>      <span class="r-comment"># Redis calls</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-instrumentation-bunny'</span>      <span class="r-comment"># RabbitMQ via Bunny</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-instrumentation-faraday'</span>    <span class="r-comment"># outbound HTTP (Faraday)</span>
+<span class="r-kw">gem</span> <span class="r-str">'opentelemetry-instrumentation-http'</span>       <span class="r-comment"># outbound HTTP (Net::HTTP)</span></pre>
+
+  <h3>Initializer — config/initializers/opentelemetry.rb</h3>
+  <pre><span class="r-kw">require</span> <span class="r-str">'opentelemetry/sdk'</span>
+<span class="r-kw">require</span> <span class="r-str">'opentelemetry/exporter/otlp'</span>
+<span class="r-kw">require</span> <span class="r-str">'opentelemetry/instrumentation/all'</span>
+
+<span class="r-const">OpenTelemetry</span>::<span class="r-const">SDK</span>.<span class="r-method">configure</span> <span class="r-kw">do</span> |c|
+  c.<span class="r-method">service_name</span>    = <span class="r-const">ENV</span>.<span class="r-method">fetch</span>(<span class="r-str">'OTEL_SERVICE_NAME'</span>, <span class="r-str">'rails-web'</span>)
+  c.<span class="r-method">service_version</span> = <span class="r-const">ENV</span>.<span class="r-method">fetch</span>(<span class="r-str">'APP_VERSION'</span>, <span class="r-str">'unknown'</span>)
+
+  c.<span class="r-method">resource</span> = <span class="r-const">OpenTelemetry</span>::<span class="r-const">SDK</span>::<span class="r-const">Resources</span>::<span class="r-const">Resource</span>.<span class="r-method">create</span>({
+    <span class="r-str">'deployment.environment'</span> => <span class="r-const">ENV</span>.<span class="r-method">fetch</span>(<span class="r-str">'DEPLOY_ENV'</span>, <span class="r-str">'development'</span>),
+    <span class="r-str">'service.namespace'</span>      => <span class="r-str">'my-platform'</span>,
+  })
+
+  c.<span class="r-method">use_all</span>  <span class="r-comment"># auto-enables all installed instrumentation gems</span>
+<span class="r-kw">end</span></pre>
+
+  <h3>Sidekiq Trace Chain</h3>
+  <div class="arch-box" style="font-size:13px;">
+    <div style="color:var(--accent);margin-bottom:8px;">HTTP Request span (Rails)</div>
+    &nbsp;&nbsp;<span style="color:var(--muted);">└──</span> <span style="color:var(--blue);">ActiveRecord span</span> (DB query)<br>
+    &nbsp;&nbsp;<span style="color:var(--muted);">└──</span> <span style="color:var(--green);">Sidekiq::Client span</span> (enqueue job → Redis) &nbsp;<span style="color:var(--muted);">← producer</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted);">traceparent stored in Sidekiq job JSON</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted);">└──</span> <span style="color:var(--yellow);">Sidekiq::Server span</span> (job processing — separate process) &nbsp;<span style="color:var(--muted);">← consumer</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted);">└──</span> <span style="color:var(--blue);">ActiveRecord span</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted);">└──</span> <span style="color:var(--blue);">Redis span</span>
+  </div>
+</section>
+
+<!-- ══ Java SDK ══ -->
+<section id="java">
+  <h2>Java: Zero-Code Agent</h2>
+
+  <div class="callout tip">
+    <strong>💡 Easiest Migration Win</strong>
+    The Java agent requires <strong>zero application code changes</strong>. Add the JAR and set
+    environment variables. All Spring Boot, JDBC, Kafka, RabbitMQ, and AWS SDK calls are
+    automatically instrumented.
+  </div>
+
+  <h3>Docker / Kubernetes — Environment Variables</h3>
+  <pre><span class="y-comment"># docker-compose.yml or Kubernetes Deployment env block</span>
+<span class="y-key">env</span>:
+  - <span class="y-key">name</span>: <span class="y-val">JAVA_TOOL_OPTIONS</span>
+    <span class="y-key">value</span>: <span class="y-str">"-javaagent:/opt/otel/opentelemetry-javaagent.jar"</span>
+  - <span class="y-key">name</span>: <span class="y-val">OTEL_SERVICE_NAME</span>
+    <span class="y-key">value</span>: <span class="y-str">"java-gateway"</span>
+  - <span class="y-key">name</span>: <span class="y-val">OTEL_EXPORTER_OTLP_ENDPOINT</span>
+    <span class="y-key">value</span>: <span class="y-str">"http://otel-collector:4317"</span>
+  - <span class="y-key">name</span>: <span class="y-val">OTEL_EXPORTER_OTLP_PROTOCOL</span>
+    <span class="y-key">value</span>: <span class="y-str">"grpc"</span>
+  - <span class="y-key">name</span>: <span class="y-val">OTEL_TRACES_EXPORTER</span>
+    <span class="y-key">value</span>: <span class="y-str">"otlp"</span>
+  - <span class="y-key">name</span>: <span class="y-val">OTEL_LOGS_EXPORTER</span>
+    <span class="y-key">value</span>: <span class="y-str">"otlp"</span>
+  - <span class="y-key">name</span>: <span class="y-val">OTEL_RESOURCE_ATTRIBUTES</span>
+    <span class="y-key">value</span>: <span class="y-str">"deployment.environment=staging,service.namespace=my-platform"</span></pre>
+
+  <h3>Kubernetes: Auto-Inject via OTEL Operator</h3>
+  <pre><span class="y-comment"># Instrumentation CRD — applies the agent to annotated pods</span>
+<span class="y-key">apiVersion</span>: <span class="y-val">opentelemetry.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-val">Instrumentation</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-val">java-instrumentation</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">exporter</span>:
+    <span class="y-key">endpoint</span>: <span class="y-val">http://otel-daemonset-collector:4317</span>
+  <span class="y-key">propagators</span>: [<span class="y-str">tracecontext</span>, <span class="y-str">baggage</span>, <span class="y-str">b3</span>]
+  <span class="y-key">java</span>:
+    <span class="y-key">image</span>: <span class="y-val">ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:latest</span>
+---
+<span class="y-comment"># Annotate your Deployment — no code changes</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">annotations</span>:
+    <span class="y-key">instrumentation.opentelemetry.io/inject-java</span>: <span class="y-str">"true"</span></pre>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Framework / Library</th><th>Auto-Instrumented?</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Spring MVC / Boot</td><td><span class="badge-pill badge-green">✅ Yes</span></td><td>HTTP server spans with route info</td></tr>
+        <tr><td>JDBC / JPA</td><td><span class="badge-pill badge-green">✅ Yes</span></td><td>DB query spans with SQL statements</td></tr>
+        <tr><td>Kafka (kafka-clients)</td><td><span class="badge-pill badge-green">✅ Yes</span></td><td>Producer + consumer spans, header propagation</td></tr>
+        <tr><td>RabbitMQ (Spring AMQP)</td><td><span class="badge-pill badge-green">✅ Yes</span></td><td>AMQP header propagation</td></tr>
+        <tr><td>AWS SDK v2 (SQS, SNS)</td><td><span class="badge-pill badge-green">✅ Yes</span></td><td>MessageAttributes propagation</td></tr>
+        <tr><td>RestTemplate / WebClient</td><td><span class="badge-pill badge-green">✅ Yes</span></td><td>Outbound HTTP spans</td></tr>
+        <tr><td>gRPC</td><td><span class="badge-pill badge-green">✅ Yes</span></td><td>Client + server spans</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ Node.js SDK ══ -->
+<section id="nodejs">
+  <h2>Node.js: Snowflake API Instrumentation</h2>
+
+  <h3>Install</h3>
+  <pre><span class="sh-cmd">npm install</span> \
+  <span class="sh-val">@opentelemetry/sdk-node</span> \
+  <span class="sh-val">@opentelemetry/auto-instrumentations-node</span> \
+  <span class="sh-val">@opentelemetry/exporter-trace-otlp-grpc</span></pre>
+
+  <h3>tracing.js — Bootstrap File (loaded before app)</h3>
+  <pre><span class="j-kw">const</span> { NodeSDK } = <span class="j-fn">require</span>(<span class="j-str">'@opentelemetry/sdk-node'</span>);
+<span class="j-kw">const</span> { getNodeAutoInstrumentations } = <span class="j-fn">require</span>(<span class="j-str">'@opentelemetry/auto-instrumentations-node'</span>);
+<span class="j-kw">const</span> { OTLPTraceExporter } = <span class="j-fn">require</span>(<span class="j-str">'@opentelemetry/exporter-trace-otlp-grpc'</span>);
+<span class="j-kw">const</span> { Resource } = <span class="j-fn">require</span>(<span class="j-str">'@opentelemetry/resources'</span>);
+<span class="j-kw">const</span> { SemanticResourceAttributes } = <span class="j-fn">require</span>(<span class="j-str">'@opentelemetry/semantic-conventions'</span>);
+
+<span class="j-kw">const</span> sdk = <span class="j-kw">new</span> <span class="j-fn">NodeSDK</span>({
+  resource: <span class="j-kw">new</span> <span class="j-fn">Resource</span>({
+    [SemanticResourceAttributes.SERVICE_NAME]:
+      process.env.OTEL_SERVICE_NAME || <span class="j-str">'node-snowflake-api'</span>,
+    [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]:
+      process.env.DEPLOY_ENV || <span class="j-str">'development'</span>,
+  }),
+  traceExporter: <span class="j-kw">new</span> <span class="j-fn">OTLPTraceExporter</span>({
+    url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || <span class="j-str">'http://otel-collector:4317'</span>,
+  }),
+  instrumentations: [<span class="j-fn">getNodeAutoInstrumentations</span>()],
+});
+
+sdk.<span class="j-fn">start</span>();
+process.<span class="j-fn">on</span>(<span class="j-str">'SIGTERM'</span>, () => sdk.<span class="j-fn">shutdown</span>());</pre>
+
+  <h3>package.json</h3>
+  <pre>{
+  <span class="j-str">"scripts"</span>: {
+    <span class="j-str">"start"</span>: <span class="j-str">"node --require ./tracing.js app.js"</span>
+  }
+}</pre>
+</section>
+
+<!-- ══ Messaging ══ -->
+<section id="messaging">
+  <h2>Context Propagation Through Your Messaging Layer</h2>
+
+  <div class="callout warn">
+    <strong>⚠ The Hard Part</strong>
+    Without explicit context propagation through message brokers, async message flows
+    appear as disconnected traces — no link between producer and consumer. This is the
+    most common gap when migrating away from Datadog inference.
+  </div>
+
+  <div class="card-grid">
+    <div class="card accent-border">
+      <h3>RabbitMQ</h3>
+      <p style="font-size:13px;"><strong>opentelemetry-instrumentation-bunny</strong> (Ruby) and the Java agent automatically inject W3C TraceContext into AMQP message headers.</p>
+      <p style="font-size:13px;">No manual code needed — publish and consume normally.</p>
+      <div class="phase-chips">
+        <span class="chip">Ruby: instrumentation-bunny</span>
+        <span class="chip">Java: agent auto</span>
+        <span class="chip">AMQP headers</span>
+      </div>
+    </div>
+    <div class="card green-border">
+      <h3>Kafka</h3>
+      <p style="font-size:13px;">Java agent instruments <code>kafka-clients</code> automatically. Trace context flows via Kafka record headers (<code>traceparent</code>, <code>tracestate</code>).</p>
+      <p style="font-size:13px;">Node.js: <code>auto-instrumentations-node</code> includes KafkaJS instrumentation.</p>
+      <div class="phase-chips">
+        <span class="chip">Java: agent auto</span>
+        <span class="chip">Node: kafkajs instr.</span>
+        <span class="chip">Record headers</span>
+      </div>
+    </div>
+    <div class="card orange-border">
+      <h3>AWS SNS / SQS</h3>
+      <p style="font-size:13px;">Trace context propagates via SQS <strong>message attributes</strong>. Both Java agent and <code>auto-instrumentations-node</code> handle this automatically via the AWS SDK instrumentation.</p>
+      <p style="font-size:13px;color:var(--orange);">⚠ SQS max 10 message attributes — reserve one slot for <code>AWSTraceHeader</code>.</p>
+      <div class="phase-chips">
+        <span class="chip">Java: aws-sdk auto</span>
+        <span class="chip">Node: aws-sdk instr.</span>
+        <span class="chip">MessageAttributes</span>
+      </div>
+    </div>
+    <div class="card purple-border">
+      <h3>Redis / Sidekiq</h3>
+      <p style="font-size:13px;"><code>instrumentation-sidekiq</code> serializes <code>traceparent</code> into Sidekiq job JSON stored in Redis. Links web request → enqueue → job execution automatically.</p>
+      <div class="phase-chips">
+        <span class="chip">Ruby: instrumentation-sidekiq</span>
+        <span class="chip">Job JSON metadata</span>
+        <span class="chip">Auto end-to-end</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Verifying Propagation</h3>
+  <div class="callout info">
+    <strong>How to check it's working</strong>
+    In SigNoz or Grafana Tempo, send a test request and search for the trace.
+    You should see spans with <code>kind=PRODUCER</code> (publish) linked to spans with
+    <code>kind=CONSUMER</code> (process) in the same trace tree. If they appear as two
+    separate traces, the headers are not flowing through the broker.
+  </div>
+</section>
+
+<!-- ══ Collector ══ -->
+<section id="collector">
+  <h2>OTEL Collector Deployment by Platform</h2>
+
+  <div class="card-grid">
+    <div class="card blue-border">
+      <h3>EC2 / VM — Docker Sidecar</h3>
+      <p style="font-size:13px;">Run a Collector container alongside each service in docker-compose. All services on the host point to <code>http://otel-collector:4318</code>.</p>
+    </div>
+    <div class="card green-border">
+      <h3>Kubernetes — OTEL Operator DaemonSet</h3>
+      <p style="font-size:13px;">Deploy the OTEL Operator and a DaemonSet Collector (one pod per node). Pods send to the node-local collector. Includes k8sattributes processor.</p>
+    </div>
+  </div>
+
+  <h3>EC2 Docker Compose</h3>
+  <pre><span class="y-comment"># docker-compose.yml (per service on EC2)</span>
+<span class="y-key">services</span>:
+  <span class="y-section">app</span>:
+    <span class="y-key">image</span>: <span class="y-val">my-service:latest</span>
+    <span class="y-key">environment</span>:
+      <span class="y-val">OTEL_EXPORTER_OTLP_ENDPOINT</span>: <span class="y-str">"http://otel-collector:4318"</span>
+      <span class="y-val">OTEL_EXPORTER_OTLP_PROTOCOL</span>: <span class="y-str">"http/protobuf"</span>
+    <span class="y-key">depends_on</span>: [<span class="y-val">otel-collector</span>]
+
+  <span class="y-section">otel-collector</span>:
+    <span class="y-key">image</span>: <span class="y-val">otel/opentelemetry-collector-contrib:0.96.0</span>
+    <span class="y-key">volumes</span>:
+      - <span class="y-str">./otel-collector.yaml:/etc/otelcol-contrib/config.yaml</span>
+    <span class="y-key">ports</span>:
+      - <span class="y-str">"4317:4317"</span>   <span class="y-comment"># OTLP gRPC</span>
+      - <span class="y-str">"4318:4318"</span>   <span class="y-comment"># OTLP HTTP</span></pre>
+
+  <h3>Kubernetes DaemonSet (OTEL Operator)</h3>
+  <pre><span class="y-key">apiVersion</span>: <span class="y-val">opentelemetry.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-val">OpenTelemetryCollector</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-val">otel-daemonset</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">mode</span>: <span class="y-val">daemonset</span>
+  <span class="y-key">config</span>: |
+    <span class="y-key">receivers</span>:
+      <span class="y-key">otlp</span>:
+        <span class="y-key">protocols</span>:
+          <span class="y-key">grpc</span>: { <span class="y-key">endpoint</span>: <span class="y-val">0.0.0.0:4317</span> }
+          <span class="y-key">http</span>: { <span class="y-key">endpoint</span>: <span class="y-val">0.0.0.0:4318</span> }
+    <span class="y-key">processors</span>:
+      <span class="y-key">k8sattributes</span>:
+        <span class="y-key">extract</span>:
+          <span class="y-key">metadata</span>: [<span class="y-val">k8s.namespace.name</span>, <span class="y-val">k8s.pod.name</span>, <span class="y-val">k8s.deployment.name</span>]
+    <span class="y-key">exporters</span>:
+      <span class="y-key">otlp/signoz</span>:
+        <span class="y-key">endpoint</span>: <span class="y-str">"http://signoz-otel-collector.monitoring:4317"</span>
+        <span class="y-key">tls</span>: { <span class="y-key">insecure</span>: <span class="y-val">true</span> }</pre>
+</section>
+
+<!-- ══ Environments ══ -->
+<section id="envs">
+  <h2>Environment Routing Strategy</h2>
+
+  <div class="callout tip">
+    <strong>💡 Key Principle</strong>
+    Application code is <strong>identical</strong> across all environments. Only the OTEL Collector
+    configuration changes. Set <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> to your local collector —
+    the collector decides where data goes.
+  </div>
+
+  <div class="env-grid">
+    <div class="env-card">
+      <div class="env-label">Production</div>
+      <div class="env-name" style="color:var(--red);">Datadog</div>
+      <div class="flow-arrow">
+        <span class="from">OTEL SDK</span>→<span class="from">Collector</span>→
+        <span class="to to-dd">Datadog</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Unchanged. All traces and logs continue to Datadog via the <code>datadog</code> exporter.</p>
+    </div>
+    <div class="env-card">
+      <div class="env-label">Staging</div>
+      <div class="env-name" style="color:var(--green);">SigNoz (Persistent)</div>
+      <div class="flow-arrow">
+        <span class="from">OTEL SDK</span>→<span class="from">Collector</span>→
+        <span class="to to-sig">SigNoz</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">One SigNoz instance per staging cluster. Data persists between runs for trend analysis.</p>
+    </div>
+    <div class="env-card">
+      <div class="env-label">Integration (E2E)</div>
+      <div class="env-name" style="color:var(--yellow);">SigNoz (Ephemeral)</div>
+      <div class="flow-arrow">
+        <span class="from">OTEL SDK</span>→<span class="from">Collector</span>→
+        <span class="to to-sig">SigNoz</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Spin up SigNoz with each isolated env. Torn down after E2E tests. Cost = $0 in backend fees.</p>
+    </div>
+    <div class="env-card">
+      <div class="env-label">Test / CI</div>
+      <div class="env-name" style="color:var(--muted);">No-Op</div>
+      <div class="flow-arrow">
+        <span class="from">OTEL SDK</span>→
+        <span class="to to-none">none exporter</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Set <code>OTEL_TRACES_EXPORTER=none</code>. No network calls, no cost, fast tests.</p>
+    </div>
+  </div>
+
+  <h3>Production Collector Config (→ Datadog)</h3>
+  <pre><span class="y-key">exporters</span>:
+  <span class="y-section">datadog</span>:
+    <span class="y-key">api</span>:
+      <span class="y-key">key</span>: <span class="y-str">"${DD_API_KEY}"</span>
+      <span class="y-key">site</span>: <span class="y-val">datadoghq.com</span>
+    <span class="y-key">traces</span>:
+      <span class="y-key">span_name_as_resource_name</span>: <span class="y-val">true</span>
+<span class="y-key">service</span>:
+  <span class="y-key">pipelines</span>:
+    <span class="y-key">traces</span>:
+      <span class="y-key">receivers</span>: [<span class="y-val">otlp</span>]
+      <span class="y-key">processors</span>: [<span class="y-val">batch</span>, <span class="y-val">resource</span>]
+      <span class="y-key">exporters</span>: [<span class="y-val">datadog</span>]
+    <span class="y-key">logs</span>:
+      <span class="y-key">receivers</span>: [<span class="y-val">otlp</span>, <span class="y-val">filelog</span>]
+      <span class="y-key">processors</span>: [<span class="y-val">batch</span>, <span class="y-val">resource</span>]
+      <span class="y-key">exporters</span>: [<span class="y-val">datadog</span>]</pre>
+
+  <h3>Integration Ephemeral Stack (docker-compose)</h3>
+  <pre><span class="y-comment"># docker-compose.integration.yaml — deploy alongside each isolated env</span>
+<span class="y-key">services</span>:
+  <span class="y-section">signoz</span>:
+    <span class="y-key">image</span>: <span class="y-val">signoz/signoz:latest</span>
+    <span class="y-key">ports</span>: [<span class="y-str">"3301:3301"</span>]   <span class="y-comment"># UI</span>
+    <span class="y-key">volumes</span>: [<span class="y-str">signoz-data:/var/lib/signoz</span>]
+
+  <span class="y-section">otel-collector</span>:
+    <span class="y-key">image</span>: <span class="y-val">otel/opentelemetry-collector-contrib:0.96.0</span>
+    <span class="y-key">environment</span>:
+      <span class="y-val">SIGNOZ_ENDPOINT</span>: <span class="y-str">"http://signoz:4317"</span></pre>
+</section>
+
+<!-- ══ Roadmap ══ -->
+<section id="roadmap">
+  <h2>Migration Roadmap</h2>
+  <div class="phase-list">
+    <div class="phase-item">
+      <div class="phase-num p1">1</div>
+      <div class="phase-content">
+        <h3 style="color:var(--accent);">Log Router — Immediate Cost Win</h3>
+        <p style="font-size:13px;">Deploy OTEL Collector to non-prod environments. Configure filelog receiver + route to SigNoz. Set <code>OTEL_TRACES_EXPORTER=none</code> in test. No application code changes.</p>
+        <div class="phase-chips">
+          <span class="chip">Days 1–7</span>
+          <span class="chip">No code changes</span>
+          <span class="chip" style="color:var(--green);">Immediate cost reduction</span>
+          <span class="chip">Low risk</span>
+        </div>
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-num p2">2</div>
+      <div class="phase-content">
+        <h3 style="color:var(--green);">Ruby Services — Rails + Sidekiq</h3>
+        <p style="font-size:13px;">Add opentelemetry gems, add initializer, set env vars. Deploy to staging. Parallel-run with Datadog for 1 week. Validate Sidekiq trace chains and RabbitMQ spans.</p>
+        <div class="phase-chips">
+          <span class="chip">Weeks 2–3</span>
+          <span class="chip">Gemfile + initializer</span>
+          <span class="chip">Parallel run</span>
+          <span class="chip">Low risk</span>
+        </div>
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-num p3">3</div>
+      <div class="phase-content">
+        <h3 style="color:var(--blue);">Java Services — Zero-Code Agent</h3>
+        <p style="font-size:13px;">Add javaagent JAR to Docker images or K8s init containers. Set JAVA_TOOL_OPTIONS. Annotate K8s Deployments for auto-inject. Verify Kafka and Spring AMQP spans.</p>
+        <div class="phase-chips">
+          <span class="chip">Weeks 3–4</span>
+          <span class="chip">Dockerfile only</span>
+          <span class="chip">K8s annotation</span>
+          <span class="chip">Low risk</span>
+        </div>
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-num p4">4</div>
+      <div class="phase-content">
+        <h3 style="color:var(--yellow);">Node.js APIs</h3>
+        <p style="font-size:13px;">npm install OTEL packages, create tracing.js, update package.json start command. Set env vars. Deploy to staging, verify Snowflake API spans link to callers.</p>
+        <div class="phase-chips">
+          <span class="chip">Weeks 4–5</span>
+          <span class="chip">package.json + tracing.js</span>
+          <span class="chip">Low risk</span>
+        </div>
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-num p5">5</div>
+      <div class="phase-content">
+        <h3 style="color:var(--purple);">Close Messaging Propagation Gaps</h3>
+        <p style="font-size:13px;">Run end-to-end trace validation. Trace from web request through Sidekiq → RabbitMQ → Java consumer → Kafka → downstream. Verify SNS/SQS flows. Fix any broken trace links.</p>
+        <div class="phase-chips">
+          <span class="chip">Weeks 5–6</span>
+          <span class="chip">Validation only</span>
+          <span class="chip">Medium risk</span>
+        </div>
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-num p6">6</div>
+      <div class="phase-content">
+        <h3 style="color:var(--orange);">Decommission Datadog per Service</h3>
+        <p style="font-size:13px;">After each service is validated, remove the Datadog agent from non-prod deployments. Production continues to use Datadog via OTEL Collector. Measure cost savings per environment.</p>
+        <div class="phase-chips">
+          <span class="chip">Week 6+</span>
+          <span class="chip">Per-service</span>
+          <span class="chip" style="color:var(--green);">Cost savings realized</span>
+          <span class="chip">Low risk</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Gains ══ -->
+<section id="gains">
+  <h2>What You Gain vs. Datadog Inference</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Datadog Inference</th>
+          <th>Explicit OTEL</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Service visibility</td>
+          <td><span class="badge-pill badge-yellow">✅ Partial (inferred)</span></td>
+          <td><span class="badge-pill badge-green">✅ All instrumented services</span></td>
+        </tr>
+        <tr>
+          <td>Trace depth</td>
+          <td><span class="badge-pill badge-yellow">⚠ Shallow (log correlation)</span></td>
+          <td><span class="badge-pill badge-green">✅ Full span tree with timing</span></td>
+        </tr>
+        <tr>
+          <td>Kafka trace linking</td>
+          <td><span class="badge-pill badge-red">❌ No</span></td>
+          <td><span class="badge-pill badge-green">✅ Via record headers</span></td>
+        </tr>
+        <tr>
+          <td>RabbitMQ trace linking</td>
+          <td><span class="badge-pill badge-red">❌ No</span></td>
+          <td><span class="badge-pill badge-green">✅ Via AMQP headers (Bunny + Spring)</span></td>
+        </tr>
+        <tr>
+          <td>SQS / SNS trace linking</td>
+          <td><span class="badge-pill badge-red">❌ No</span></td>
+          <td><span class="badge-pill badge-green">✅ Via message attributes</span></td>
+        </tr>
+        <tr>
+          <td>Sidekiq job linking</td>
+          <td><span class="badge-pill badge-yellow">⚠ Partial (DD APM)</span></td>
+          <td><span class="badge-pill badge-green">✅ Full enqueue → process chain</span></td>
+        </tr>
+        <tr>
+          <td>Custom business spans</td>
+          <td><span class="badge-pill badge-red">❌ No</span></td>
+          <td><span class="badge-pill badge-green">✅ Manual spans anywhere in code</span></td>
+        </tr>
+        <tr>
+          <td>Cross-language consistency</td>
+          <td><span class="badge-pill badge-yellow">⚠ Varies by DD agent</span></td>
+          <td><span class="badge-pill badge-green">✅ W3C TraceContext everywhere</span></td>
+        </tr>
+        <tr>
+          <td>Non-prod cost</td>
+          <td><span class="badge-pill badge-red">❌ Full Datadog billing</span></td>
+          <td><span class="badge-pill badge-green">✅ $0 (OSS backends)</span></td>
+        </tr>
+        <tr>
+          <td>Backend portability</td>
+          <td><span class="badge-pill badge-red">❌ Locked to Datadog</span></td>
+          <td><span class="badge-pill badge-green">✅ Any OTLP-compatible backend</span></td>
+        </tr>
+        <tr>
+          <td>Header standard</td>
+          <td>x-datadog-* (proprietary)</td>
+          <td>W3C traceparent / tracestate</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Estimated Cost Impact by Environment</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Environment</th><th>Current</th><th>After Migration</th><th>Savings</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Production</td>
+          <td>Datadog</td>
+          <td>Datadog (unchanged)</td>
+          <td><span class="badge-pill badge-muted">$0 change</span></td>
+        </tr>
+        <tr>
+          <td>Staging</td>
+          <td>Datadog (per-service)</td>
+          <td>SigNoz (self-hosted)</td>
+          <td><span class="badge-pill badge-green">~80–90%</span></td>
+        </tr>
+        <tr>
+          <td>Integration (per-env)</td>
+          <td>Datadog (full ecosystem × N envs)</td>
+          <td>Ephemeral SigNoz</td>
+          <td><span class="badge-pill badge-green">~100%</span></td>
+        </tr>
+        <tr>
+          <td>Test / CI</td>
+          <td>Datadog log ingestion</td>
+          <td>No-op exporter</td>
+          <td><span class="badge-pill badge-green">~100%</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ Related ══ -->
+<section>
+  <h2>Related Guides</h2>
+  <div class="card-grid">
+    <div class="card">
+      <h3><a href="otel-rails-stack.html" style="color:var(--blue);text-decoration:none;">Rails Stack Analysis</a></h3>
+      <p style="font-size:13px;">Options A/B/C for the Rails observability pipeline.</p>
+    </div>
+    <div class="card">
+      <h3><a href="otel-migration-plan.html" style="color:var(--blue);text-decoration:none;">Migration Plan</a></h3>
+      <p style="font-size:13px;">Phase-by-phase from Logstash → OTEL with rollback guidance.</p>
+    </div>
+    <div class="card">
+      <h3><a href="otel-nonprod-options.html" style="color:var(--blue);text-decoration:none;">Non-Prod Options</a></h3>
+      <p style="font-size:13px;">Grafana LGTM, SigNoz, Uptrace, Jaeger comparison for dev/staging.</p>
+    </div>
+    <div class="card">
+      <h3><a href="otel-distributed.html" style="color:var(--blue);text-decoration:none;">Distributed Tracing Theory</a></h3>
+      <p style="font-size:13px;">W3C TraceContext, B3, context propagation concepts.</p>
+    </div>
+    <div class="card">
+      <h3><a href="otel-kubernetes.html" style="color:var(--blue);text-decoration:none;">Kubernetes Deployment</a></h3>
+      <p style="font-size:13px;">OTEL Operator, DaemonSet, auto-instrumentation injection.</p>
+    </div>
+    <div class="card">
+      <h3><a href="otel-sdks.html" style="color:var(--blue);text-decoration:none;">Language SDKs</a></h3>
+      <p style="font-size:13px;">Setup guides for Python, Node.js, Go, Java.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

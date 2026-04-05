@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTEL Language SDKs — Python, Node.js, Go & Java</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  header { border-left: 3px solid var(--orange); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--orange); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── SDK ARCHITECTURE ── */
+  .sdk-arch {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 40px;
+  }
+  .sdk-layers { display: flex; flex-direction: column; gap: 0; max-width: 420px; margin: 0 auto; }
+  .sdk-layer {
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  .sdk-layer-title { padding: 7px 14px; font-family: var(--mono); font-size: 11px; font-weight: 600; border-bottom: 1px solid var(--border); }
+  .sdk-layer-body { padding: 8px 14px; font-size: 11px; color: var(--muted); }
+  .layer-code .sdk-layer-title { background: #0c1f35; color: var(--accent); }
+  .layer-api .sdk-layer-title { background: #0d2318; color: var(--green); }
+  .layer-sdk .sdk-layer-title { background: #1f1a08; color: var(--yellow); }
+  .layer-export .sdk-layer-title { background: #1e0c40; color: var(--purple); }
+  .sdk-layer-arrow { text-align: center; color: var(--muted); font-size: 14px; padding: 2px 0; }
+
+  /* ── ENV VARS ── */
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; font-family: var(--mono); font-size: 10px; line-height: 1.8; overflow-x: auto; margin-bottom: 20px; }
+  .e-key { color: var(--accent); }
+  .e-val { color: var(--green); }
+  .e-comment { color: #334155; }
+  .y-key { color: var(--accent); }
+  .y-val { color: var(--green); }
+  .y-str { color: var(--yellow); }
+  .y-comment { color: #334155; }
+  .y-section { color: var(--orange); font-weight: 600; }
+  .p-kw { color: var(--purple); }
+  .p-fn { color: var(--accent); }
+  .p-str { color: var(--yellow); }
+  .p-comment { color: #334155; }
+  .p-num { color: var(--orange); }
+  .p-cls { color: var(--green); }
+
+  /* ── LANGUAGE TABS ── */
+  .lang-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 40px; }
+  .lang-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .lang-header { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .lang-name { font-family: var(--mono); font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .lang-auto { font-size: 11px; font-family: var(--mono); padding: 2px 8px; border-radius: 10px; display: inline-block; margin-top: 4px; }
+  .auto-yes { background: #0d2318; color: var(--green); border: 1px solid #1a4530; }
+  .auto-no { background: #1f0c0c; color: var(--red); border: 1px solid #4a1a1a; }
+  .lang-body { padding: 14px 16px; }
+  .lang-body p { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+
+  .lang-card.python .lang-header { background: #1a1020; }
+  .lang-card.python .lang-name { color: #60a5fa; }
+  .lang-card.node .lang-header { background: #0d2318; }
+  .lang-card.node .lang-name { color: var(--green); }
+  .lang-card.go .lang-header { background: #0c1f35; }
+  .lang-card.go .lang-name { color: var(--accent); }
+  .lang-card.java .lang-header { background: #1f1208; }
+  .lang-card.java .lang-name { color: var(--orange); }
+
+  .tag { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 3px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); display: inline-block; margin: 2px; }
+
+  /* ── LANGUAGE SECTIONS ── */
+  .lang-section { margin-bottom: 48px; }
+  .lang-section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border-radius: 8px 8px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  .lang-section-header .lang-icon { font-family: var(--mono); font-size: 20px; font-weight: 600; }
+  .lang-section-header h2 { font-size: 18px; font-weight: 700; }
+  .lang-section-header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .lang-section.python .lang-section-header { background: #12091f; }
+  .lang-section.python .lang-icon { color: #60a5fa; }
+  .lang-section.node .lang-section-header { background: #091f0d; }
+  .lang-section.node .lang-icon { color: var(--green); }
+  .lang-section.go .lang-section-header { background: #091525; }
+  .lang-section.go .lang-icon { color: var(--accent); }
+  .lang-section.java .lang-section-header { background: #1f1008; }
+  .lang-section.java .lang-icon { color: var(--orange); }
+
+  .lang-section-body {
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 24px;
+    background: var(--surface);
+  }
+
+  .sub-section { margin-bottom: 24px; }
+  .sub-section h4 { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+
+  .install-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--green);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--green);
+    margin-bottom: 16px;
+    line-height: 1.8;
+  }
+
+  .info-banner {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--orange);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .info-banner strong { color: var(--orange); }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 12px; }
+  .compare-table th { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; }
+  .compare-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .compare-table td:first-child { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table tr:hover td { background: var(--surface); }
+  .check-yes { color: var(--green); }
+  .check-no { color: var(--red); }
+
+  @media (max-width: 700px) {
+    .lang-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// Architecture Guide — Section 07</div>
+  <h1>Language SDKs: Python, Node.js,<br>Go & Java</h1>
+  <p>How to set up OTEL instrumentation in the four most common server-side languages — from zero-code auto-instrumentation to manual span creation.</p>
+</header>
+
+<!-- SDK ARCHITECTURE -->
+<div class="section-label">SDK Architecture — Shared Concepts</div>
+<div class="sdk-arch">
+  <p style="font-size:12px;color:var(--muted);margin-bottom:20px;max-width:600px;">Every OTEL SDK — regardless of language — implements the same layered architecture. The API and SDK are separate packages; libraries instrument against the API, your app wires up the SDK.</p>
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:start;">
+    <div class="sdk-layers">
+      <div class="sdk-layer layer-code">
+        <div class="sdk-layer-title">Your Application Code</div>
+        <div class="sdk-layer-body">Calls tracer.start_span(), meter.create_counter(), etc.</div>
+      </div>
+      <div class="sdk-layer-arrow">↓ calls</div>
+      <div class="sdk-layer layer-api">
+        <div class="sdk-layer-title">OTEL API</div>
+        <div class="sdk-layer-body">Stable, minimal interface. No-ops if no SDK is registered.</div>
+      </div>
+      <div class="sdk-layer-arrow">↓ delegates to</div>
+      <div class="sdk-layer layer-sdk">
+        <div class="sdk-layer-title">OTEL SDK</div>
+        <div class="sdk-layer-body">Samplers · Span processors · Metric aggregators</div>
+      </div>
+      <div class="sdk-layer-arrow">↓ flushes to</div>
+      <div class="sdk-layer layer-export">
+        <div class="sdk-layer-title">Exporter (OTLP)</div>
+        <div class="sdk-layer-body">Sends to Collector or backend over gRPC/HTTP</div>
+      </div>
+    </div>
+    <div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Key environment variables — work across all languages:</p>
+      <pre style="margin-bottom:0"><span class="e-key">OTEL_SERVICE_NAME</span>=<span class="e-val">my-service</span>
+<span class="e-key">OTEL_SERVICE_VERSION</span>=<span class="e-val">1.4.2</span>
+<span class="e-key">OTEL_DEPLOYMENT_ENVIRONMENT</span>=<span class="e-val">production</span>
+<span class="e-key">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="e-val">http://localhost:4317</span>
+<span class="e-key">OTEL_EXPORTER_OTLP_PROTOCOL</span>=<span class="e-val">grpc</span>
+<span class="e-key">OTEL_PROPAGATORS</span>=<span class="e-val">tracecontext,baggage</span>
+<span class="e-key">OTEL_TRACES_SAMPLER</span>=<span class="e-val">parentbased_traceidratio</span>
+<span class="e-key">OTEL_TRACES_SAMPLER_ARG</span>=<span class="e-val">0.1</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- LANGUAGE CARDS OVERVIEW -->
+<div class="section-label">Language Overview</div>
+<div class="lang-grid">
+  <div class="lang-card python">
+    <div class="lang-header">
+      <div class="lang-name">Python</div>
+      <div class="lang-auto auto-yes">✓ Auto-instrumentation</div>
+    </div>
+    <div class="lang-body">
+      <p>CLI wrapper injects instrumentation with zero code changes. SDK setup for full control.</p>
+      <span class="tag">FastAPI</span><span class="tag">Django</span><span class="tag">SQLAlchemy</span><span class="tag">Celery</span>
+    </div>
+  </div>
+  <div class="lang-card node">
+    <div class="lang-header">
+      <div class="lang-name">Node.js</div>
+      <div class="lang-auto auto-yes">✓ Auto-instrumentation</div>
+    </div>
+    <div class="lang-body">
+      <p>--require flag or --import for ESM. NodeSDK bundles everything.</p>
+      <span class="tag">Express</span><span class="tag">Fastify</span><span class="tag">MySQL</span><span class="tag">Redis</span>
+    </div>
+  </div>
+  <div class="lang-card go">
+    <div class="lang-header">
+      <div class="lang-name">Go</div>
+      <div class="lang-auto auto-no">✗ Manual only</div>
+    </div>
+    <div class="lang-body">
+      <p>No zero-code option. Manual spans + contrib instrumentation packages.</p>
+      <span class="tag">net/http</span><span class="tag">gRPC</span><span class="tag">gin</span><span class="tag">chi</span>
+    </div>
+  </div>
+  <div class="lang-card java">
+    <div class="lang-header">
+      <div class="lang-name">Java</div>
+      <div class="lang-auto auto-yes">✓ Auto-instrumentation</div>
+    </div>
+    <div class="lang-body">
+      <p>-javaagent flag instruments the whole JVM. 100+ frameworks covered.</p>
+      <span class="tag">Spring Boot</span><span class="tag">JDBC</span><span class="tag">Kafka</span><span class="tag">gRPC</span>
+    </div>
+  </div>
+</div>
+
+<!-- PYTHON -->
+<div class="lang-section python">
+  <div class="lang-section-header">
+    <div class="lang-icon">Py</div>
+    <div>
+      <h2>Python</h2>
+      <p>opentelemetry-sdk · opentelemetry-instrument CLI · auto-instrumentation packages</p>
+    </div>
+  </div>
+  <div class="lang-section-body">
+
+    <div class="sub-section">
+      <h4>Zero-Code Auto-Instrumentation</h4>
+      <div class="install-block">pip install opentelemetry-distro opentelemetry-exporter-otlp-proto-grpc<br>opentelemetry-bootstrap --action=install</div>
+      <pre><span class="e-comment"># Wrap any Python process — no code changes</span>
+opentelemetry-instrument \
+  --service-name <span class="e-val">my-service</span> \
+  --exporter-otlp-endpoint <span class="e-val">http://localhost:4317</span> \
+  python app.py</pre>
+    </div>
+
+    <div class="sub-section">
+      <h4>Manual Span</h4>
+      <pre><span class="p-kw">with</span> tracer.<span class="p-fn">start_as_current_span</span>(<span class="p-str">"process-order"</span>) <span class="p-kw">as</span> span:
+    span.<span class="p-fn">set_attribute</span>(<span class="p-str">"order.id"</span>, order_id)
+    <span class="p-kw">try</span>:
+        result = <span class="p-fn">process</span>(order)
+    <span class="p-kw">except</span> <span class="p-cls">PaymentError</span> <span class="p-kw">as</span> e:
+        span.<span class="p-fn">set_status</span>(<span class="p-cls">StatusCode</span>.ERROR, <span class="p-fn">str</span>(e))
+        span.<span class="p-fn">record_exception</span>(e)
+        <span class="p-kw">raise</span></pre>
+    </div>
+
+  </div>
+</div>
+
+<!-- NODE.JS -->
+<div class="lang-section node">
+  <div class="lang-section-header">
+    <div class="lang-icon">JS</div>
+    <div>
+      <h2>Node.js</h2>
+      <p>@opentelemetry/sdk-node · auto-instrumentations-node · CJS and ESM support</p>
+    </div>
+  </div>
+  <div class="lang-section-body">
+
+    <div class="sub-section">
+      <h4>Zero-Code (CJS)</h4>
+      <pre><span class="e-comment"># No code changes — require the register script before app loads</span>
+<span class="e-key">OTEL_SERVICE_NAME</span>=<span class="e-val">my-service</span> \
+<span class="e-key">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="e-val">http://localhost:4317</span> \
+node --require @opentelemetry/auto-instrumentations-node/register app.js</pre>
+    </div>
+
+    <div class="sub-section">
+      <h4>SDK Setup (tracing.js)</h4>
+      <pre><span class="p-kw">const</span> { <span class="p-cls">NodeSDK</span> } = <span class="p-fn">require</span>(<span class="p-str">'@opentelemetry/sdk-node'</span>);
+<span class="p-kw">const</span> { <span class="p-cls">OTLPTraceExporter</span> } = <span class="p-fn">require</span>(<span class="p-str">'@opentelemetry/exporter-trace-otlp-grpc'</span>);
+
+<span class="p-kw">const</span> sdk = <span class="p-kw">new</span> <span class="p-cls">NodeSDK</span>({
+  traceExporter: <span class="p-kw">new</span> <span class="p-cls">OTLPTraceExporter</span>({ url: <span class="p-str">'http://localhost:4317'</span> }),
+  instrumentations: [<span class="p-fn">getNodeAutoInstrumentations</span>()],
+});
+sdk.<span class="p-fn">start</span>();
+process.<span class="p-fn">on</span>(<span class="p-str">'SIGTERM'</span>, () => sdk.<span class="p-fn">shutdown</span>().<span class="p-fn">then</span>(() => process.<span class="p-fn">exit</span>(<span class="p-num">0</span>)));</pre>
+    </div>
+
+    <div class="sub-section">
+      <h4>Manual Span</h4>
+      <pre><span class="p-kw">const</span> tracer = trace.<span class="p-fn">getTracer</span>(<span class="p-str">'order-service'</span>);
+
+<span class="p-kw">async function</span> <span class="p-fn">processOrder</span>(orderId) {
+  <span class="p-kw">return</span> tracer.<span class="p-fn">startActiveSpan</span>(<span class="p-str">'process-order'</span>, <span class="p-kw">async</span> (span) => {
+    span.<span class="p-fn">setAttribute</span>(<span class="p-str">'order.id'</span>, orderId);
+    <span class="p-kw">try</span> {
+      <span class="p-kw">return await</span> <span class="p-fn">doWork</span>(orderId);
+    } <span class="p-kw">catch</span> (err) {
+      span.<span class="p-fn">setStatus</span>({ code: <span class="p-cls">SpanStatusCode</span>.ERROR });
+      span.<span class="p-fn">recordException</span>(err);
+      <span class="p-kw">throw</span> err;
+    } <span class="p-kw">finally</span> { span.<span class="p-fn">end</span>(); }
+  });
+}</pre>
+    </div>
+
+  </div>
+</div>
+
+<!-- GO -->
+<div class="lang-section go">
+  <div class="lang-section-header">
+    <div class="lang-icon">Go</div>
+    <div>
+      <h2>Go</h2>
+      <p>go.opentelemetry.io/otel · Manual spans · contrib instrumentation packages</p>
+    </div>
+  </div>
+  <div class="lang-section-body">
+
+    <div class="info-banner"><strong>Note:</strong> Go has no zero-code auto-instrumentation. All spans are added manually or via per-library contrib packages under go.opentelemetry.io/contrib/.</div>
+
+    <div class="sub-section">
+      <h4>SDK Initialisation</h4>
+      <pre>exporter, _ := otlptracegrpc.<span class="p-fn">New</span>(ctx,
+    otlptracegrpc.<span class="p-fn">WithEndpoint</span>(<span class="p-str">"localhost:4317"</span>),
+    otlptracegrpc.<span class="p-fn">WithInsecure</span>(),
+)
+res := resource.<span class="p-fn">NewWithAttributes</span>(semconv.SchemaURL,
+    semconv.<span class="p-fn">ServiceName</span>(<span class="p-str">"order-service"</span>),
+)
+tp := sdktrace.<span class="p-fn">NewTracerProvider</span>(
+    sdktrace.<span class="p-fn">WithBatcher</span>(exporter),
+    sdktrace.<span class="p-fn">WithResource</span>(res),
+)
+otel.<span class="p-fn">SetTracerProvider</span>(tp)
+<span class="p-kw">defer</span> tp.<span class="p-fn">Shutdown</span>(ctx)</pre>
+    </div>
+
+    <div class="sub-section">
+      <h4>Manual Span</h4>
+      <pre>tracer := otel.<span class="p-fn">Tracer</span>(<span class="p-str">"order-service"</span>)
+
+<span class="p-kw">func</span> <span class="p-fn">processOrder</span>(ctx context.Context, orderID <span class="p-kw">string</span>) <span class="p-kw">error</span> {
+    ctx, span := tracer.<span class="p-fn">Start</span>(ctx, <span class="p-str">"process-order"</span>)
+    <span class="p-kw">defer</span> span.<span class="p-fn">End</span>()
+
+    span.<span class="p-fn">SetAttributes</span>(attribute.<span class="p-fn">String</span>(<span class="p-str">"order.id"</span>, orderID))
+    <span class="p-kw">if</span> err := <span class="p-fn">doWork</span>(ctx, orderID); err != <span class="p-kw">nil</span> {
+        span.<span class="p-fn">RecordError</span>(err)
+        span.<span class="p-fn">SetStatus</span>(codes.Error, err.<span class="p-fn">Error</span>())
+        <span class="p-kw">return</span> err
+    }
+    <span class="p-kw">return nil</span>
+}</pre>
+    </div>
+
+  </div>
+</div>
+
+<!-- JAVA -->
+<div class="lang-section java">
+  <div class="lang-section-header">
+    <div class="lang-icon">☕</div>
+    <div>
+      <h2>Java</h2>
+      <p>opentelemetry-javaagent.jar · -javaagent flag · Spring Boot native config</p>
+    </div>
+  </div>
+  <div class="lang-section-body">
+
+    <div class="sub-section">
+      <h4>Zero-Code via Java Agent</h4>
+      <pre><span class="e-comment"># Download once</span>
+curl -L https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar \
+     -o opentelemetry-javaagent.jar
+
+<span class="e-comment"># Run — instruments the entire JVM</span>
+java \
+  -javaagent:opentelemetry-javaagent.jar \
+  -D<span class="e-key">OTEL_SERVICE_NAME</span>=<span class="e-val">order-service</span> \
+  -D<span class="e-key">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="e-val">http://localhost:4317</span> \
+  -jar myapp.jar</pre>
+    </div>
+
+    <div class="sub-section">
+      <h4>Spring Boot (application.properties)</h4>
+      <pre><span class="e-key">otel.service.name</span>=<span class="e-val">order-service</span>
+<span class="e-key">otel.exporter.otlp.endpoint</span>=<span class="e-val">http://localhost:4317</span>
+<span class="e-key">otel.traces.sampler</span>=<span class="e-val">parentbased_traceidratio</span>
+<span class="e-key">otel.traces.sampler.arg</span>=<span class="e-val">0.1</span></pre>
+    </div>
+
+    <div class="sub-section">
+      <h4>Manual Span (SDK)</h4>
+      <pre><span class="p-cls">Tracer</span> tracer = <span class="p-cls">GlobalOpenTelemetry</span>.<span class="p-fn">getTracer</span>(<span class="p-str">"order-service"</span>);
+
+<span class="p-cls">Span</span> span = tracer.<span class="p-fn">spanBuilder</span>(<span class="p-str">"processOrder"</span>)
+    .<span class="p-fn">setAttribute</span>(<span class="p-str">"order.id"</span>, orderId)
+    .<span class="p-fn">startSpan</span>();
+
+<span class="p-kw">try</span> (<span class="p-kw">var</span> scope = span.<span class="p-fn">makeCurrent</span>()) {
+    <span class="p-fn">processOrder</span>(orderId);
+} <span class="p-kw">catch</span> (<span class="p-cls">Exception</span> e) {
+    span.<span class="p-fn">recordException</span>(e);
+    span.<span class="p-fn">setStatus</span>(<span class="p-cls">StatusCode</span>.ERROR, e.<span class="p-fn">getMessage</span>());
+    <span class="p-kw">throw</span> e;
+} <span class="p-kw">finally</span> { span.<span class="p-fn">end</span>(); }</pre>
+    </div>
+
+  </div>
+</div>
+
+<!-- COMPARISON TABLE -->
+<div class="section-label">Language Comparison</div>
+<table class="compare-table">
+  <thead>
+    <tr>
+      <th>Feature</th>
+      <th>Python</th>
+      <th>Node.js</th>
+      <th>Go</th>
+      <th>Java</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Auto-instrumentation</td>
+      <td><span class="check-yes">✓</span> CLI wrapper</td>
+      <td><span class="check-yes">✓</span> --require flag</td>
+      <td><span class="check-no">✗</span> Manual only</td>
+      <td><span class="check-yes">✓</span> -javaagent</td>
+    </tr>
+    <tr>
+      <td>Setup complexity</td>
+      <td>Low</td>
+      <td>Low</td>
+      <td>Medium</td>
+      <td>Low (with agent)</td>
+    </tr>
+    <tr>
+      <td>Manual span style</td>
+      <td>Context manager</td>
+      <td>startActiveSpan()</td>
+      <td>tracer.Start(ctx)</td>
+      <td>spanBuilder()</td>
+    </tr>
+    <tr>
+      <td>Async support</td>
+      <td>asyncio native</td>
+      <td>Promises / async-await</td>
+      <td>Context propagation</td>
+      <td>CompletableFuture</td>
+    </tr>
+    <tr>
+      <td>Library coverage</td>
+      <td>Broad</td>
+      <td>Broad</td>
+      <td>Selective (contrib)</td>
+      <td>Very broad (100+)</td>
+    </tr>
+  </tbody>
+</table>
+
+</body>
+</html>

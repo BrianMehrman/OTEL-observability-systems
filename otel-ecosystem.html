@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTEL Ecosystem — Backends, Platforms & Stack Choices</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --accent2: #7b5ea7;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  header { border-left: 3px solid var(--green); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--green); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── ECOSYSTEM MAP ── */
+  .eco-map {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 24px;
+    margin-bottom: 40px;
+  }
+  .eco-map-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .eco-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .eco-box .label { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .eco-box .sub { font-size: 11px; color: var(--muted); }
+  .eco-box.app { border-top: 2px solid var(--accent); }
+  .eco-box.collector { border-top: 2px solid var(--orange); }
+  .eco-box.oss { border-top: 2px solid var(--green); }
+  .eco-box.saas { border-top: 2px solid var(--purple); }
+  .eco-arrow { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 20px; padding-top: 14px; }
+  .eco-fanout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .eco-fanout .eco-box { text-align: left; }
+  .fanout-label { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+
+  /* ── OSS BACKENDS GRID ── */
+  .backends-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 40px; }
+  .backend-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .backend-card-header { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .backend-name { font-family: var(--mono); font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .backend-signal { font-size: 10px; font-family: var(--mono); color: var(--muted); }
+  .backend-card-body { padding: 14px 16px; }
+  .backend-card-body p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .tag { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 3px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); display: inline-block; margin: 2px; }
+  .tag.green { border-color: #1a4530; color: var(--green); background: #0d2318; }
+  .tag.accent { border-color: #1a3a5c; color: var(--accent); background: #0c1f35; }
+  .tag.orange { border-color: #3d3210; color: var(--yellow); background: #1f1a08; }
+  .tag.purple { border-color: #3d1d7a; color: var(--purple); background: #1e0c40; }
+
+  .backend-card.traces .backend-card-header { background: #0c1f35; }
+  .backend-card.metrics .backend-card-header { background: #0d2318; }
+  .backend-card.logs .backend-card-header { background: #1f1a08; }
+  .backend-card.traces .backend-name { color: var(--accent); }
+  .backend-card.metrics .backend-name { color: var(--green); }
+  .backend-card.logs .backend-name { color: var(--yellow); }
+  .backend-card.ui .backend-card-header { background: #1a1020; }
+  .backend-card.ui .backend-name { color: var(--purple); }
+
+  /* ── OSS STACK ── */
+  .oss-stack {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 40px;
+    display: grid;
+    grid-template-columns: 1fr 40px 220px;
+    gap: 0;
+    align-items: center;
+  }
+  .signal-rows { display: flex; flex-direction: column; gap: 10px; }
+  .signal-row { display: flex; align-items: center; gap: 10px; }
+  .signal-pill { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 6px 14px; border-radius: 20px; min-width: 80px; text-align: center; }
+  .signal-pill.traces { background: #0c1f35; color: var(--accent); border: 1px solid #1a3a5c; }
+  .signal-pill.metrics { background: #0d2318; color: var(--green); border: 1px solid #1a4530; }
+  .signal-pill.logs { background: #1f1a08; color: var(--yellow); border: 1px solid #3d3210; }
+  .signal-arrow { color: var(--muted); font-size: 12px; }
+  .signal-backend { font-family: var(--mono); font-size: 11px; color: var(--text); padding: 6px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; }
+  .stack-arrow { display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--muted); }
+  .grafana-box { background: #1a1020; border: 1px solid #3d1d7a; border-radius: 8px; padding: 20px; text-align: center; }
+  .grafana-box .g-label { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--purple); margin-bottom: 6px; }
+  .grafana-box .g-sub { font-size: 11px; color: var(--muted); }
+
+  /* ── SAAS TABLE ── */
+  .saas-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 12px; }
+  .saas-table th { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; }
+  .saas-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--muted); vertical-align: top; }
+  .saas-table td:first-child { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); }
+  .saas-table tr:last-child td { border-bottom: none; }
+  .saas-table tr:hover td { background: var(--surface); }
+
+  /* ── SCALE TIERS ── */
+  .tiers { display: flex; flex-direction: column; gap: 14px; margin-bottom: 40px; }
+  .tier-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .tier-header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .tier-badge { font-family: var(--mono); font-size: 10px; padding: 2px 10px; border-radius: 3px; font-weight: 600; }
+  .tier-small .tier-header { background: #0c1f35; }
+  .tier-small .tier-badge { background: #0c2340; color: var(--accent); }
+  .tier-medium .tier-header { background: #0d2318; }
+  .tier-medium .tier-badge { background: #0d2f1f; color: var(--green); }
+  .tier-large .tier-header { background: #1e0c40; }
+  .tier-large .tier-badge { background: #280c40; color: var(--purple); }
+  .tier-header h3 { font-size: 13px; font-weight: 600; }
+  .tier-body { padding: 18px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .tier-rec h4 { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .tier-rec ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  .tier-rec li { font-size: 12px; color: var(--muted); padding-left: 12px; position: relative; }
+  .tier-rec li::before { content: '→'; position: absolute; left: 0; color: var(--border); }
+
+  /* ── FAN-OUT CONFIG ── */
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; font-family: var(--mono); font-size: 10px; line-height: 1.8; overflow-x: auto; margin-bottom: 40px; }
+  .y-key { color: var(--accent); }
+  .y-val { color: var(--green); }
+  .y-str { color: var(--yellow); }
+  .y-comment { color: #334155; }
+  .y-section { color: var(--orange); font-weight: 600; }
+
+  /* ── DECISION GUIDE ── */
+  .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 40px; }
+  .decision-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 18px; }
+  .decision-card h4 { font-family: var(--mono); font-size: 11px; font-weight: 600; margin-bottom: 10px; }
+  .decision-card.self-host h4 { color: var(--green); }
+  .decision-card.saas h4 { color: var(--purple); }
+  .decision-card ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .decision-card li { font-size: 12px; color: var(--muted); padding-left: 14px; position: relative; }
+  .decision-card.self-host li::before { content: '✓'; position: absolute; left: 0; color: var(--green); }
+  .decision-card.saas li::before { content: '✓'; position: absolute; left: 0; color: var(--purple); }
+
+  .note { background: #0c1f10; border: 1px solid #1a4025; border-radius: 6px; padding: 16px 20px; font-size: 12px; color: #86efac; font-family: var(--mono); margin-bottom: 40px; }
+  .note strong { color: var(--green); }
+
+  @media (max-width: 700px) {
+    .backends-grid, .decision-grid { grid-template-columns: 1fr; }
+    .eco-map-row { grid-template-columns: 1fr; }
+    .tier-body { grid-template-columns: 1fr; }
+    .oss-stack { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// Architecture Guide — Section 06</div>
+  <h1>Ecosystem: Backends, Platforms<br>& Stack Choices</h1>
+  <p>OTEL is a pipeline, not a storage layer. This section maps the backend landscape — OSS tools, SaaS platforms, and which combinations work at each scale tier.</p>
+</header>
+
+<!-- ECOSYSTEM MAP -->
+<div class="section-label">The Ecosystem at a Glance</div>
+<div class="eco-map">
+  <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Your instrumentation stays the same. The Collector routes telemetry to whichever backends you choose — OSS, SaaS, or both simultaneously.</p>
+  <div class="eco-map-row">
+    <div class="eco-box app">
+      <div class="label">Your Application</div>
+      <div class="sub">Instrumented with OTEL SDK</div>
+    </div>
+    <div class="eco-arrow">→</div>
+    <div class="eco-box collector">
+      <div class="label">OTEL Collector</div>
+      <div class="sub">Receive → Process → Route</div>
+    </div>
+    <div>
+      <div class="fanout-label">Fan-out to backends</div>
+      <div class="eco-fanout">
+        <div class="eco-box oss"><div class="label">OSS Backends</div><div class="sub">Jaeger · Prometheus · Loki · Tempo · Grafana</div></div>
+        <div class="eco-box saas"><div class="label">SaaS Platforms</div><div class="sub">Grafana Cloud · Datadog · Honeycomb · Dynatrace · New Relic</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OSS BACKENDS -->
+<div class="section-label">OSS Backends</div>
+<div class="backends-grid">
+
+  <div class="backend-card traces">
+    <div class="backend-card-header">
+      <div class="backend-name">Jaeger</div>
+      <div class="backend-signal">Traces only</div>
+    </div>
+    <div class="backend-card-body">
+      <p>CNCF reference implementation for distributed trace storage. Trace waterfall UI, service dependency graph, trace comparison.</p>
+      <span class="tag accent">OTLP</span>
+      <span class="tag accent">Jaeger native</span>
+      <span class="tag">Elasticsearch</span>
+      <span class="tag">Cassandra</span>
+    </div>
+  </div>
+
+  <div class="backend-card metrics">
+    <div class="backend-card-header">
+      <div class="backend-name">Prometheus</div>
+      <div class="backend-signal">Metrics only</div>
+    </div>
+    <div class="backend-card-body">
+      <p>The de facto standard for cloud-native metrics. Scrape-based or remote write via OTEL. PromQL for powerful querying and alerting.</p>
+      <span class="tag green">PromQL</span>
+      <span class="tag">remote_write</span>
+      <span class="tag">Thanos</span>
+      <span class="tag">Mimir</span>
+    </div>
+  </div>
+
+  <div class="backend-card logs">
+    <div class="backend-card-header">
+      <div class="backend-name">Loki</div>
+      <div class="backend-signal">Logs only</div>
+    </div>
+    <div class="backend-card-body">
+      <p>Grafana's log backend. Indexes metadata only (not full text) keeping storage costs low. Stores to object storage (S3, GCS).</p>
+      <span class="tag orange">LogQL</span>
+      <span class="tag">S3</span>
+      <span class="tag">GCS</span>
+      <span class="tag">Azure Blob</span>
+    </div>
+  </div>
+
+  <div class="backend-card traces">
+    <div class="backend-card-header">
+      <div class="backend-name">Tempo</div>
+      <div class="backend-signal">Traces only</div>
+    </div>
+    <div class="backend-card-body">
+      <p>Grafana's low-cost trace backend. Object storage only — no indexing overhead. Query by trace_id or with TraceQL.</p>
+      <span class="tag accent">OTLP</span>
+      <span class="tag accent">Jaeger</span>
+      <span class="tag accent">Zipkin</span>
+      <span class="tag">TraceQL</span>
+    </div>
+  </div>
+
+  <div class="backend-card ui" style="grid-column: span 2;">
+    <div class="backend-card-header">
+      <div class="backend-name">Grafana</div>
+      <div class="backend-signal">Visualisation & Alerting — queries all backends via data sources</div>
+    </div>
+    <div class="backend-card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <p>The standard UI layer for the OSS stack. Not a backend — it queries Prometheus, Loki, Tempo, Jaeger, and 50+ other sources from a single interface.</p>
+      </div>
+      <div>
+        <span class="tag purple">Prometheus</span>
+        <span class="tag purple">Loki</span>
+        <span class="tag purple">Tempo</span>
+        <span class="tag purple">Jaeger</span>
+        <span class="tag">Alerting</span>
+        <span class="tag">Community dashboards</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- OSS STACK -->
+<div class="section-label">The Standard OSS Stack</div>
+<div class="oss-stack">
+  <div class="signal-rows">
+    <div class="signal-row">
+      <span class="signal-pill traces">Traces</span>
+      <span class="signal-arrow">→</span>
+      <span class="signal-backend">Tempo</span>
+    </div>
+    <div class="signal-row">
+      <span class="signal-pill metrics">Metrics</span>
+      <span class="signal-arrow">→</span>
+      <span class="signal-backend">Prometheus</span>
+    </div>
+    <div class="signal-row">
+      <span class="signal-pill logs">Logs</span>
+      <span class="signal-arrow">→</span>
+      <span class="signal-backend">Loki</span>
+    </div>
+  </div>
+  <div class="stack-arrow">→</div>
+  <div class="grafana-box">
+    <div class="g-label">Grafana</div>
+    <div class="g-sub">Unified dashboards,<br>alerting & trace linking</div>
+  </div>
+</div>
+
+<!-- SAAS TABLE -->
+<div class="section-label">SaaS Platforms</div>
+<table class="saas-table">
+  <thead>
+    <tr>
+      <th>Platform</th>
+      <th>Signals</th>
+      <th>Pricing model</th>
+      <th>Standout strength</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Grafana Cloud</td>
+      <td>Traces, Metrics, Logs</td>
+      <td>Usage-based (free tier)</td>
+      <td>Best OSS compatibility; same UX as self-hosted Grafana</td>
+    </tr>
+    <tr>
+      <td>Datadog</td>
+      <td>Traces, Metrics, Logs, RUM</td>
+      <td>Host/container</td>
+      <td>Widest integrations; strong APM and anomaly detection</td>
+    </tr>
+    <tr>
+      <td>Honeycomb</td>
+      <td>Traces, Logs</td>
+      <td>Event-based</td>
+      <td>Best trace query UX (BubbleUp); high-cardinality search</td>
+    </tr>
+    <tr>
+      <td>Dynatrace</td>
+      <td>Traces, Metrics, Logs, AI</td>
+      <td>Host-based</td>
+      <td>AI-driven root cause analysis; enterprise compliance</td>
+    </tr>
+    <tr>
+      <td>New Relic</td>
+      <td>Traces, Metrics, Logs</td>
+      <td>Data-ingest</td>
+      <td>Broad language support; generous free tier (100 GB/month)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- SCALE TIERS -->
+<div class="section-label">Stack Recommendations by Scale</div>
+<div class="tiers">
+
+  <div class="tier-card tier-small">
+    <div class="tier-header">
+      <span class="tier-badge">SMALL</span>
+      <h3>Single service · Low traffic · Small team</h3>
+    </div>
+    <div class="tier-body">
+      <div class="tier-rec">
+        <h4>Recommendation</h4>
+        <ul>
+          <li>SaaS platform — skip self-hosted infrastructure</li>
+          <li>Grafana Cloud or New Relic free tier covers most workloads</li>
+          <li>OTLP direct from SDK, or one simple Collector for batching</li>
+          <li>100% sampling is fine at low volume</li>
+        </ul>
+      </div>
+      <div class="tier-rec">
+        <h4>Best choices</h4>
+        <ul>
+          <li>Cost-conscious → Grafana Cloud free tier</li>
+          <li>Traces-first → Honeycomb (best trace query UX)</li>
+          <li>Simplest setup → New Relic (OTLP native, large free tier)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier-card tier-medium">
+    <div class="tier-header">
+      <span class="tier-badge">MEDIUM</span>
+      <h3>Multiple services · Moderate traffic · Growing team</h3>
+    </div>
+    <div class="tier-body">
+      <div class="tier-rec">
+        <h4>Recommendation</h4>
+        <ul>
+          <li>Managed SaaS or self-hosted OSS stack</li>
+          <li>Single Collector tier for batching, enrichment, basic routing</li>
+          <li>Grafana + Tempo + Prometheus + Loki if you have ops capacity</li>
+          <li>Grafana Cloud if you want the same UX without the ops</li>
+        </ul>
+      </div>
+      <div class="tier-rec">
+        <h4>Decision point</h4>
+        <ul>
+          <li>Data residency needed → self-host</li>
+          <li>Move fast, no ops team → Grafana Cloud or Datadog</li>
+          <li>Analytics-heavy → Honeycomb for trace queries</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier-card tier-large">
+    <div class="tier-header">
+      <span class="tier-badge">LARGE</span>
+      <h3>Many services · High traffic · Multiple teams</h3>
+    </div>
+    <div class="tier-body">
+      <div class="tier-rec">
+        <h4>Recommendation</h4>
+        <ul>
+          <li>Two-tier Collector: agents per node, gateway for sampling &amp; routing</li>
+          <li>OSS with Thanos/Mimir for durable HA Prometheus</li>
+          <li>Datadog or Dynatrace for AI analysis and enterprise breadth</li>
+          <li>Fan-out: different teams can own different backends</li>
+        </ul>
+      </div>
+      <div class="tier-rec">
+        <h4>Common patterns</h4>
+        <ul>
+          <li>Platform team owns Prometheus + Grafana</li>
+          <li>App teams send to Datadog APM for product observability</li>
+          <li>Gateway fans out to both from a single pipeline</li>
+          <li>Honeycomb for high-cardinality debugging alongside the main stack</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FAN-OUT CONFIG -->
+<div class="section-label">Fan-Out: One Pipeline, Multiple Backends</div>
+<pre><span class="y-section">service:</span>
+  <span class="y-key">pipelines:</span>
+    <span class="y-key">traces:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[otlp/tempo, otlp/honeycomb]</span>   <span class="y-comment"># both receive all traces</span>
+
+    <span class="y-key">metrics:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[prometheusremotewrite, datadog]</span>   <span class="y-comment"># both receive all metrics</span>
+
+    <span class="y-key">logs:</span>
+      <span class="y-key">receivers:</span>  <span class="y-str">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-str">[memory_limiter, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-str">[loki]</span></pre>
+
+<!-- SELF-HOST VS SAAS -->
+<div class="section-label">Self-Host vs. SaaS Decision Guide</div>
+<div class="decision-grid">
+  <div class="decision-card self-host">
+    <h4>// Lean towards Self-Host when…</h4>
+    <ul>
+      <li>Data residency or sovereignty requirements</li>
+      <li>Ops team available to run infrastructure</li>
+      <li>Data volume makes SaaS cost prohibitive</li>
+      <li>Full control over retention and query</li>
+      <li>Existing Kubernetes cluster with spare capacity</li>
+    </ul>
+  </div>
+  <div class="decision-card saas">
+    <h4>// Lean towards SaaS when…</h4>
+    <ul>
+      <li>Small or no dedicated ops team</li>
+      <li>Need to move fast and get visibility quickly</li>
+      <li>AI/ML-driven analysis required</li>
+      <li>Enterprise compliance (SOC2, HIPAA) needed out of the box</li>
+      <li>Multiple signal types with one vendor relationship</li>
+    </ul>
+  </div>
+</div>
+
+<div class="note"><strong>Rule of thumb:</strong> Start with SaaS. Migrate to self-hosted OSS when data volume makes SaaS pricing prohibitive and you have the ops team to support it. The Collector makes migration safe — swap the exporter config, not the instrumentation.</div>
+
+</body>
+</html>

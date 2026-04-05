@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTEL Tools Reference — Libraries, Backends & Platforms</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --teal: #2dd4bf;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  header { border-left: 3px solid var(--teal); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--teal); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── LEGEND ── */
+  .legend {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 40px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .legend-badge { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 600; }
+  .badge-t { background: #0c1f35; color: var(--accent); border: 1px solid #1a3a5c; }
+  .badge-m { background: #0d2318; color: var(--green); border: 1px solid #1a4530; }
+  .badge-l { background: #1f1a08; color: var(--yellow); border: 1px solid #3d3210; }
+  .badge-p { background: #1e0c40; color: var(--purple); border: 1px solid #3d1d7a; }
+  .badge-yes { background: #0d2318; color: var(--green); border: 1px solid #1a4530; }
+  .badge-no { background: #1f0c0c; color: var(--red); border: 1px solid #4a1a1a; }
+  .badge-partial { background: #1f1a08; color: var(--yellow); border: 1px solid #3d3210; }
+
+  /* ── REFERENCE TABLE ── */
+  .ref-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+  .ref-table-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .ref-table-header h2 { font-size: 14px; font-weight: 600; }
+  .ref-table-header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .table-icon { font-family: var(--mono); font-size: 18px; font-weight: 700; flex-shrink: 0; }
+
+  .ref-table-wrap.libs .ref-table-header { background: #0c1f35; }
+  .ref-table-wrap.libs .table-icon { color: var(--accent); }
+  .ref-table-wrap.backends .ref-table-header { background: #0d2318; }
+  .ref-table-wrap.backends .table-icon { color: var(--green); }
+  .ref-table-wrap.platforms .ref-table-header { background: #1e0c40; }
+  .ref-table-wrap.platforms .table-icon { color: var(--purple); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+    background: var(--surface2);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  td:first-child { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; }
+  td.vendor { font-size: 11px; color: var(--muted); }
+
+  .tag { font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 3px; display: inline-block; margin: 1px; }
+  .tag-t { background: #0c1f35; color: var(--accent); border: 1px solid #1a3a5c; }
+  .tag-m { background: #0d2318; color: var(--green); border: 1px solid #1a4530; }
+  .tag-l { background: #1f1a08; color: var(--yellow); border: 1px solid #3d3210; }
+  .tag-p { background: #1e0c40; color: var(--purple); border: 1px solid #3d1d7a; }
+  .tag-r { background: #1f1208; color: var(--orange); border: 1px solid #3d2208; }
+
+  .otlp-yes { color: var(--green); font-family: var(--mono); font-size: 11px; }
+  .otlp-no { color: var(--red); font-family: var(--mono); font-size: 11px; }
+  .otlp-partial { color: var(--yellow); font-family: var(--mono); font-size: 11px; }
+
+  .license { font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+  .lic-oss { background: #0d2318; color: var(--green); border: 1px solid #1a4530; }
+  .lic-sav { background: #1f1a08; color: var(--yellow); border: 1px solid #3d3210; }
+  .lic-com { background: #1f0c0c; color: var(--red); border: 1px solid #4a1a1a; }
+
+  /* ── SUB-SECTION TABS ── */
+  .sub-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #0a0f0a;
+  }
+
+  /* ── QUICK PICK TABLE ── */
+  .pick-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--teal);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+  .pick-table-wrap th { background: #081a18; color: var(--teal); }
+  .pick-table-wrap td:first-child { color: var(--teal); font-size: 12px; }
+  .pick-table-wrap td { font-size: 12px; }
+
+  @media (max-width: 900px) {
+    body { font-size: 13px; }
+    td, th { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// Tools Reference</div>
+  <h1>Libraries, Backends &amp; Platforms<br>in the Observability Ecosystem</h1>
+  <p>Three reference tables spanning the full tool landscape — from what runs inside your code to where your data ultimately lives. All entries evaluated for OTLP compatibility.</p>
+</header>
+
+<!-- LEGEND -->
+<div class="section-label">How to Read These Tables</div>
+<div class="legend">
+  <div class="legend-item"><span class="badge-t tag">T</span> Traces</div>
+  <div class="legend-item"><span class="badge-m tag">M</span> Metrics</div>
+  <div class="legend-item"><span class="badge-l tag">L</span> Logs</div>
+  <div class="legend-item"><span class="badge-p tag">P</span> Profiles / Continuous profiling</div>
+  <div class="legend-item"><span class="badge-yes tag">✅ Yes</span> Native OTLP support</div>
+  <div class="legend-item"><span class="badge-partial tag">⚠️ Partial</span> OTLP via bridge, agent, or remote_write</div>
+  <div class="legend-item"><span class="badge-no tag">❌ No</span> No OTLP support</div>
+  <div class="legend-item"><span class="lic-oss license">Apache / MIT</span> Open source</div>
+  <div class="legend-item"><span class="lic-sav license">SSPL / BSL</span> Source-available</div>
+  <div class="legend-item"><span class="lic-com license">Commercial</span> Proprietary</div>
+</div>
+
+<!-- TABLE 1: INSTRUMENTATION LIBRARIES -->
+<div class="section-label">Table 1 — Instrumentation Libraries &amp; Agents</div>
+<div class="ref-table-wrap libs">
+  <div class="ref-table-header">
+    <div class="table-icon">{ }</div>
+    <div>
+      <h2>Instrumentation Libraries &amp; Agents</h2>
+      <p>Run inside or alongside your application to produce telemetry data</p>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Library / Agent</th>
+        <th>Vendor</th>
+        <th>Languages</th>
+        <th>Signals</th>
+        <th>OTLP native</th>
+        <th>Auto-instrumentation</th>
+        <th>License</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>OpenTelemetry SDK</td>
+        <td class="vendor">CNCF / Community</td>
+        <td>Python, Node.js, Go, Java, .NET, Ruby, PHP, Rust, Swift, Erlang, C++</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>✅ Python, Node, Java, .NET</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>OpenTelemetry Java Agent</td>
+        <td class="vendor">CNCF / Community</td>
+        <td>Java (JVM)</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>✅ 100+ frameworks via -javaagent</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Elastic APM Agent</td>
+        <td class="vendor">Elastic</td>
+        <td>Python, Node.js, Go, Java, .NET, Ruby, PHP</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-partial">⚠️ Via bridge</span></td>
+        <td>✅ Yes</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Datadog APM (ddtrace)</td>
+        <td class="vendor">Datadog</td>
+        <td>Python, Node.js, Go, Java, Ruby, PHP, .NET</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-partial">⚠️ Via DD Agent</span></td>
+        <td>✅ Yes</td>
+        <td><span class="lic-oss license">BSD 3-Clause</span></td>
+      </tr>
+      <tr>
+        <td>New Relic APM Agent</td>
+        <td class="vendor">New Relic</td>
+        <td>Python, Node.js, Go, Java, Ruby, PHP, .NET</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>✅ Yes</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Dynatrace OneAgent</td>
+        <td class="vendor">Dynatrace</td>
+        <td>All major (bytecode + kernel injection)</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ OTLP ingest</span></td>
+        <td>✅ Full-stack, kernel-level</td>
+        <td><span class="lic-com license">Commercial</span></td>
+      </tr>
+      <tr>
+        <td>Micrometer</td>
+        <td class="vendor">VMware / Community</td>
+        <td>Java</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td><span class="otlp-partial">⚠️ Via OTLP registry</span></td>
+        <td>❌ Manual</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Prometheus Client Libs</td>
+        <td class="vendor">CNCF / Community</td>
+        <td>Go, Python, Java, Ruby, .NET, Rust</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td><span class="otlp-no">❌ Prometheus format</span></td>
+        <td>❌ Manual</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Pyroscope SDK</td>
+        <td class="vendor">Grafana Labs</td>
+        <td>Go, Python, Java, Ruby, Rust</td>
+        <td><span class="tag tag-p">Profiles</span></td>
+        <td><span class="otlp-partial">⚠️ OTel Profiling (draft)</span></td>
+        <td>❌ Manual</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Sentry SDK</td>
+        <td class="vendor">Sentry</td>
+        <td>30+ languages</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-no">❌ Sentry protocol</span></td>
+        <td>✅ Partial</td>
+        <td><span class="lic-oss license">MIT</span></td>
+      </tr>
+      <tr>
+        <td>OpenTracing <em style="color:var(--muted);font-size:10px;">(archived)</em></td>
+        <td class="vendor">CNCF</td>
+        <td>Multiple</td>
+        <td><span class="tag tag-t">T</span></td>
+        <td><span class="otlp-no">❌ Pre-OTLP</span></td>
+        <td>❌ Manual</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>OpenCensus <em style="color:var(--muted);font-size:10px;">(archived)</em></td>
+        <td class="vendor">Google</td>
+        <td>Go, Java, Python, Ruby</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span></td>
+        <td><span class="otlp-no">❌ Pre-OTLP</span></td>
+        <td>❌ Manual</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TABLE 2: BACKENDS -->
+<div class="section-label">Table 2 — Backends &amp; Storage Systems</div>
+<div class="ref-table-wrap backends">
+  <div class="ref-table-header">
+    <div class="table-icon">⬡</div>
+    <div>
+      <h2>Backends &amp; Storage Systems</h2>
+      <p>Where telemetry data is stored and queried — the destination for OTEL Collector exporters</p>
+    </div>
+  </div>
+
+  <div class="sub-label">── Trace Backends</div>
+  <table>
+    <thead>
+      <tr>
+        <th>System</th>
+        <th>Signals</th>
+        <th>Query language</th>
+        <th>Storage backend</th>
+        <th>OTLP native</th>
+        <th>License</th>
+        <th>Self-host</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Jaeger</td>
+        <td><span class="tag tag-t">T</span></td>
+        <td>Jaeger UI / HTTP API</td>
+        <td>Elasticsearch, Cassandra, Badger, in-memory</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Tempo</td>
+        <td><span class="tag tag-t">T</span></td>
+        <td>TraceQL</td>
+        <td>Object storage (S3, GCS, Azure Blob)</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Zipkin</td>
+        <td><span class="tag tag-t">T</span></td>
+        <td>Zipkin UI / HTTP API</td>
+        <td>Elasticsearch, MySQL, Cassandra, in-memory</td>
+        <td><span class="otlp-partial">⚠️ Via OTEL bridge</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>SigNoz</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>SQL-like (ClickHouse)</td>
+        <td>ClickHouse</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Uptrace</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>SQL</td>
+        <td>ClickHouse</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-sav license">BSL 1.1</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>ClickHouse</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-l">L</span></td>
+        <td>SQL</td>
+        <td>Native columnar</td>
+        <td><span class="otlp-yes">✅ Via exporter</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="sub-label">── Metrics Backends</div>
+  <table>
+    <thead>
+      <tr>
+        <th>System</th>
+        <th>Signals</th>
+        <th>Query language</th>
+        <th>Storage backend</th>
+        <th>OTLP native</th>
+        <th>License</th>
+        <th>Self-host</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Prometheus</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>PromQL</td>
+        <td>Local TSDB</td>
+        <td><span class="otlp-partial">⚠️ Via remote_write</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Thanos</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>PromQL</td>
+        <td>Object storage (S3, GCS)</td>
+        <td><span class="otlp-partial">⚠️ Via Prometheus</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Grafana Mimir</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>PromQL</td>
+        <td>Object storage</td>
+        <td><span class="otlp-partial">⚠️ Via remote_write</span></td>
+        <td><span class="lic-sav license">AGPL 3.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>VictoriaMetrics</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>MetricsQL (PromQL-compatible)</td>
+        <td>Native TSDB</td>
+        <td><span class="otlp-partial">⚠️ Via remote_write</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span> (single) / <span class="lic-com license">Commercial</span> (cluster)</td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>InfluxDB</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>Flux / InfluxQL</td>
+        <td>Native TSM engine</td>
+        <td><span class="otlp-yes">✅ Yes (v2+)</span></td>
+        <td><span class="lic-oss license">MIT</span> (v2) / <span class="lic-com license">Commercial</span> (cloud)</td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>TimescaleDB</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>SQL (PostgreSQL)</td>
+        <td>PostgreSQL</td>
+        <td><span class="otlp-partial">⚠️ Via exporter</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span> / <span class="lic-com license">Commercial</span></td>
+        <td>✅</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="sub-label">── Log Backends</div>
+  <table>
+    <thead>
+      <tr>
+        <th>System</th>
+        <th>Signals</th>
+        <th>Query language</th>
+        <th>Storage backend</th>
+        <th>OTLP native</th>
+        <th>License</th>
+        <th>Self-host</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Loki</td>
+        <td><span class="tag tag-l">L</span></td>
+        <td>LogQL</td>
+        <td>Object storage (S3, GCS, Azure Blob)</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-sav license">AGPL 3.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Elasticsearch</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-t">T</span></td>
+        <td>Lucene / EQL / KQL</td>
+        <td>Lucene shards</td>
+        <td><span class="otlp-yes">✅ Via Elastic Agent</span></td>
+        <td><span class="lic-sav license">SSPL / Elastic License</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>OpenSearch</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-t">T</span></td>
+        <td>Lucene / PPL / SQL</td>
+        <td>Lucene shards</td>
+        <td><span class="otlp-yes">✅ Via exporter</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Quickwit</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-t">T</span></td>
+        <td>REST / SQL</td>
+        <td>Object storage (S3)</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-sav license">AGPL 3.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Splunk</td>
+        <td><span class="tag tag-l">L</span></td>
+        <td>SPL</td>
+        <td>Splunk proprietary</td>
+        <td><span class="otlp-yes">✅ Via HEC / OTEL</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>✅ Enterprise</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TABLE 3: PLATFORMS -->
+<div class="section-label">Table 3 — Observability Platforms &amp; SaaS</div>
+<div class="ref-table-wrap platforms">
+  <div class="ref-table-header">
+    <div class="table-icon">◈</div>
+    <div>
+      <h2>Observability Platforms &amp; SaaS</h2>
+      <p>End-to-end products combining storage, dashboards, alerting, and analysis</p>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Platform</th>
+        <th>Vendor</th>
+        <th>Signals</th>
+        <th>OTLP native</th>
+        <th>Query language(s)</th>
+        <th>Pricing model</th>
+        <th>Open source core</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Grafana Cloud</td>
+        <td class="vendor">Grafana Labs</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span><span class="tag tag-p">Profiles</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>PromQL, LogQL, TraceQL</td>
+        <td>Usage-based (free tier)</td>
+        <td><span class="lic-oss license">✅ Grafana OSS</span></td>
+      </tr>
+      <tr>
+        <td>Datadog</td>
+        <td class="vendor">Datadog</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span><span class="tag tag-r">RUM</span><span class="tag tag-p">Profiles</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>Datadog query language</td>
+        <td>Host / container-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Honeycomb</td>
+        <td class="vendor">Honeycomb.io</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>BubbleUp / HAPI</td>
+        <td>Event-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Dynatrace</td>
+        <td class="vendor">Dynatrace</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span><span class="tag tag-r">RUM</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>DQL (Dynatrace Query Language)</td>
+        <td>Davis® Data Units (DPS)</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>New Relic</td>
+        <td class="vendor">New Relic</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span><span class="tag tag-r">RUM</span><span class="tag tag-p">Profiles</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>NRQL</td>
+        <td>Data-ingest GB/month (100 GB free)</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Elastic Observability</td>
+        <td class="vendor">Elastic</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span><span class="tag tag-r">RUM</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>KQL / EQL / Lucene</td>
+        <td>Host-based / ingest</td>
+        <td><span class="lic-sav license">⚠️ SSPL</span></td>
+      </tr>
+      <tr>
+        <td>Splunk Observability</td>
+        <td class="vendor">Cisco / Splunk</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>SPL / SignalFlow</td>
+        <td>Host-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>AppDynamics</td>
+        <td class="vendor">Cisco</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ OTLP ingest</span></td>
+        <td>AppDynamics query</td>
+        <td>Host-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Coralogix</td>
+        <td class="vendor">Coralogix</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-m">M</span><span class="tag tag-t">T</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>DataPrime / Lucene</td>
+        <td>Data-ingest GB/month</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Logz.io</td>
+        <td class="vendor">Logz.io</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-t">T</span><span class="tag tag-m">M</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>Lucene / Jaeger UI</td>
+        <td>Data-ingest GB/month</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Sumo Logic</td>
+        <td class="vendor">Sumo Logic</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-m">M</span><span class="tag tag-t">T</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>Sumo Logic query language</td>
+        <td>Credits-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>SigNoz</td>
+        <td class="vendor">SigNoz</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>SQL / PromQL</td>
+        <td>Usage-based (cloud) / free self-host</td>
+        <td><span class="lic-oss license">✅ Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Axiom</td>
+        <td class="vendor">Axiom</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-t">T</span><span class="tag tag-m">M</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>APL (Kusto-compatible)</td>
+        <td>Ingest + query volume</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Last9</td>
+        <td class="vendor">Last9</td>
+        <td><span class="tag tag-m">M</span><span class="tag tag-l">L</span><span class="tag tag-t">T</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>PromQL / LogQL</td>
+        <td>Usage-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Uptrace</td>
+        <td class="vendor">Uptrace</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>SQL</td>
+        <td>Self-host free / cloud paid</td>
+        <td><span class="lic-sav license">⚠️ BSL 1.1</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- QUICK PICK -->
+<div class="section-label">Quick Pick Guide</div>
+<div class="pick-table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Need</th>
+        <th>Recommended picks</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Fully open source, self-hosted, all signals</td>
+        <td>SigNoz (all-in-one) — or — Grafana OSS stack (Tempo + Prometheus + Loki + Grafana)</td>
+      </tr>
+      <tr>
+        <td>Best trace query UX</td>
+        <td>Honeycomb (BubbleUp), Tempo + TraceQL, or SigNoz</td>
+      </tr>
+      <tr>
+        <td>Best metrics ecosystem</td>
+        <td>Prometheus + Grafana (OSS) or Grafana Cloud</td>
+      </tr>
+      <tr>
+        <td>Broadest integrations, enterprise scale</td>
+        <td>Datadog or Dynatrace</td>
+      </tr>
+      <tr>
+        <td>Most affordable SaaS at high ingest volume</td>
+        <td>Grafana Cloud, Coralogix, or Axiom</td>
+      </tr>
+      <tr>
+        <td>High-cardinality trace debugging</td>
+        <td>Honeycomb</td>
+      </tr>
+      <tr>
+        <td>Safe migration: vendor → OSS</td>
+        <td>OTEL Collector fan-out — run old and new backend simultaneously during cutover</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>
