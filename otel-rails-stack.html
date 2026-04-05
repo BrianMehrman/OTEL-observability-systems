@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rails Observability Stack Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --teal: #2dd4bf;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  header { border-left: 3px solid var(--red); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--red); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; font-family: var(--mono); font-size: 10px; line-height: 1.8; overflow-x: auto; margin-bottom: 20px; }
+  .y-key { color: var(--accent); }
+  .y-val { color: var(--green); }
+  .y-str { color: var(--yellow); }
+  .y-comment { color: #334155; }
+  .y-section { color: var(--orange); font-weight: 600; }
+  .r-kw { color: var(--purple); }
+  .r-str { color: var(--yellow); }
+  .r-comment { color: #334155; }
+  .r-const { color: var(--green); }
+  .r-method { color: var(--accent); }
+
+  /* ── CURRENT STACK ── */
+  .stack-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 24px;
+    margin-bottom: 40px;
+  }
+  .stack-flow { display: flex; flex-direction: column; gap: 0; max-width: 600px; }
+  .stack-node {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+  }
+  .stack-node .node-icon { font-family: var(--mono); font-size: 18px; flex-shrink: 0; padding-top: 2px; }
+  .stack-node .node-label { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .stack-node .node-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .stack-node.rails { background: #0d1f10; border-color: #1a4525; }
+  .stack-node.rails .node-icon { color: var(--red); }
+  .stack-node.rails .node-label { color: var(--green); }
+  .stack-node.file { background: var(--surface2); }
+  .stack-node.file .node-label { color: var(--muted); }
+  .stack-node.logstash { background: #1f1208; border-color: #3d2208; }
+  .stack-node.logstash .node-label { color: var(--orange); }
+  .stack-node.elastic { background: #0f1820; border-color: #1a3040; }
+  .stack-node.elastic .node-label { color: var(--yellow); }
+  .stack-node.datadog { background: #1a0c2a; border-color: #3d1d5a; }
+  .stack-node.datadog .node-label { color: var(--purple); }
+  .pain-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: #2a0c0c;
+    border: 1px solid #5a1a1a;
+    color: var(--red);
+    margin-left: auto;
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+  .stack-arrow { display: flex; align-items: center; gap: 10px; padding: 6px 16px; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .stack-arrow::before { content: '↓'; font-size: 14px; }
+
+  /* ── PAIN POINTS ── */
+  .pain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 40px; }
+  .pain-card { background: var(--surface); border: 1px solid #3a1818; border-left: 3px solid var(--red); border-radius: 6px; padding: 16px; }
+  .pain-card h4 { font-family: var(--mono); font-size: 11px; color: var(--red); margin-bottom: 8px; }
+  .pain-card p { font-size: 12px; color: var(--muted); }
+
+  /* ── RESOURCE TABLE ── */
+  .res-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 12px; }
+  .res-table th { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; }
+  .res-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .res-table td:first-child { color: var(--text); }
+  .res-table tr.total td { color: var(--red); border-top: 1px solid var(--border); font-weight: 600; }
+  .res-table tr:last-child td { border-bottom: none; }
+
+  /* ── OPTION CARDS ── */
+  .option-wrap {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+  .option-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .option-badge { font-family: var(--mono); font-size: 10px; padding: 3px 10px; border-radius: 3px; font-weight: 600; flex-shrink: 0; }
+  .option-header h2 { font-size: 18px; font-weight: 700; }
+  .option-header p { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .option-body { padding: 24px; }
+
+  .option-a .option-header { background: #081a18; }
+  .option-a .option-badge { background: #0d2318; color: var(--green); border: 1px solid #1a4530; }
+  .option-b .option-header { background: #0c1a2a; }
+  .option-b .option-badge { background: #0c1f35; color: var(--accent); border: 1px solid #1a3a5c; }
+
+  /* ── OPTION STACK DIAGRAM ── */
+  .opt-flow { display: flex; flex-direction: column; gap: 0; max-width: 560px; margin-bottom: 24px; }
+  .opt-node { border: 1px solid var(--border); border-radius: 5px; padding: 10px 14px; display: flex; gap: 10px; align-items: flex-start; }
+  .opt-node .n-label { font-family: var(--mono); font-size: 11px; font-weight: 600; }
+  .opt-node .n-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .opt-node.rails-opt { background: #0d1f10; border-color: #1a4525; }
+  .opt-node.rails-opt .n-label { color: var(--green); }
+  .opt-node.collector { background: #1f1a08; border-color: #3d3210; }
+  .opt-node.collector .n-label { color: var(--yellow); }
+  .opt-node.backends-a { background: #081a18; border-color: #1a4530; }
+  .opt-node.backends-a .n-label { color: var(--green); }
+  .opt-node.grafana { background: #1a1020; border-color: #3d1d7a; }
+  .opt-node.grafana .n-label { color: var(--purple); }
+  .opt-node.signoz { background: #0c1f35; border-color: #1a3a5c; }
+  .opt-node.signoz .n-label { color: var(--accent); }
+  .opt-node.clickhouse { background: #1f1a08; border-color: #3d3210; }
+  .opt-node.clickhouse .n-label { color: var(--yellow); }
+  .opt-arrow { display: flex; align-items: center; gap: 8px; padding: 4px 14px; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .opt-arrow::before { content: '↓'; font-size: 14px; }
+
+  .benefits-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .benefit { background: #0d2318; border: 1px solid #1a4530; border-radius: 5px; padding: 12px; }
+  .benefit h5 { font-family: var(--mono); font-size: 10px; color: var(--green); margin-bottom: 5px; }
+  .benefit p { font-size: 11px; color: var(--muted); }
+
+  .res-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .res-chip { font-family: var(--mono); font-size: 10px; padding: 4px 10px; border-radius: 3px; background: var(--surface2); border: 1px solid var(--border); }
+  .res-chip span { color: var(--green); margin-left: 4px; }
+
+  /* ── RAILS INSTRUMENTATION ── */
+  .rails-block {
+    background: var(--surface);
+    border: 1px solid #1a4525;
+    border-left: 3px solid var(--green);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 40px;
+  }
+  .rails-block h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--green); font-family: var(--mono); }
+
+  /* ── MIGRATION PHASES ── */
+  .phases { display: flex; flex-direction: column; gap: 0; margin-bottom: 40px; }
+  .phase { display: flex; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .phase:last-child { border-bottom: none; }
+  .phase-num { font-family: var(--mono); font-size: 24px; font-weight: 700; color: var(--border); flex-shrink: 0; width: 40px; }
+  .phase-content h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .phase-content p { font-size: 12px; color: var(--muted); }
+  .phase-content .phase-detail { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .phase-content .phase-step { font-family: var(--mono); font-size: 10px; color: var(--muted); padding: 3px 0; }
+  .phase-content .phase-step::before { content: '→  '; color: var(--accent); }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 40px; }
+  .cmp-table { width: 100%; border-collapse: collapse; }
+  .cmp-table th { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; background: var(--surface2); }
+  .cmp-table th:nth-child(2) { background: #1a0c0c; }
+  .cmp-table th:nth-child(3) { background: #081a18; }
+  .cmp-table th:nth-child(4) { background: #0c1a2a; }
+  .cmp-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); vertical-align: top; }
+  .cmp-table td:first-child { font-family: var(--mono); font-size: 10px; color: var(--text); font-weight: 600; }
+  .cmp-table tr:last-child td { border-bottom: none; }
+  .cmp-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .check-yes { color: var(--green); font-family: var(--mono); font-size: 11px; }
+  .check-no { color: var(--red); font-family: var(--mono); font-size: 11px; }
+  .check-warn { color: var(--yellow); font-family: var(--mono); font-size: 11px; }
+
+  /* ── DECISION BANNER ── */
+  .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 40px; }
+  .dec-card { border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+  .dec-card.a { background: #081a18; border-color: #1a4530; }
+  .dec-card.b { background: #0c1a2a; border-color: #1a3a5c; }
+  .dec-card.c { background: #1a102a; border-color: #3d1d5a; }
+  .dec-card h4 { font-family: var(--mono); font-size: 11px; font-weight: 600; margin-bottom: 10px; }
+  .dec-card.a h4 { color: var(--green); }
+  .dec-card.b h4 { color: var(--accent); }
+  .dec-card.c h4 { color: var(--purple); }
+  .dec-card ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .dec-card li { font-size: 12px; color: var(--muted); padding-left: 14px; position: relative; }
+  .dec-card.a li::before { content: '✓'; position: absolute; left: 0; color: var(--green); }
+  .dec-card.b li::before { content: '✓'; position: absolute; left: 0; color: var(--accent); }
+  .dec-card.c li::before { content: '✓'; position: absolute; left: 0; color: var(--purple); }
+
+  /* ── OPTION C ── */
+  .option-c .option-header { background: #120a1f; }
+  .option-c .option-badge { background: #1a0c2a; color: var(--purple); border: 1px solid #4a1d7a; }
+  .env-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .env-block { border: 1px solid var(--border); border-radius: 6px; padding: 16px; }
+  .env-block.prod { background: #1a102a; border-color: #3d1d5a; }
+  .env-block.nonprod { background: #0c1a2a; border-color: #1a3a5c; }
+  .env-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 10px; font-weight: 600; }
+  .env-block.prod .env-label { color: var(--purple); }
+  .env-block.nonprod .env-label { color: var(--accent); }
+
+  @media (max-width: 700px) {
+    .pain-grid, .benefits-grid, .decision-grid, .env-split { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// Stack Analysis</div>
+  <h1>Rails Observability:<br>Current Stack &amp; Modern Alternatives</h1>
+  <p>An audit of the current Rails log pipeline on EC2 — with three replacement options: two fully self-hosted stacks that eliminate SaaS cost entirely, and a hybrid that keeps Datadog for production while running a free stack for non-production environments.</p>
+</header>
+
+<!-- CURRENT STACK -->
+<div class="section-label">Current Stack — Rails on Docker / EC2</div>
+<div class="stack-diagram">
+  <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">All containers run on a single EC2 instance. Signal coverage: <strong style="color:var(--text)">logs only.</strong></p>
+  <div class="stack-flow">
+
+    <div class="stack-node rails">
+      <div class="node-icon">⬡</div>
+      <div>
+        <div class="node-label">Rails App (Docker)</div>
+        <div class="node-sub">Puma · writes structured log lines to file</div>
+      </div>
+    </div>
+
+    <div class="stack-arrow">writes to disk</div>
+
+    <div class="stack-node file">
+      <div class="node-icon" style="color:var(--muted)">📄</div>
+      <div>
+        <div class="node-label">Log File on Disk</div>
+        <div class="node-sub">/var/log/rails/production.log</div>
+      </div>
+      <span class="pain-badge">⚠ log rotation risk</span>
+    </div>
+
+    <div class="stack-arrow">tailed by Logstash file input</div>
+
+    <div class="stack-node logstash">
+      <div class="node-icon">⚙</div>
+      <div>
+        <div class="node-label">Logstash (Docker)</div>
+        <div class="node-sub">JVM process · 1–2 GB RAM idle · parses &amp; ships logs</div>
+      </div>
+      <span class="pain-badge">⚠ 1–2 GB RAM</span>
+    </div>
+
+    <div class="stack-arrow">Elasticsearch output plugin</div>
+
+    <div class="stack-node elastic">
+      <div class="node-icon">🔍</div>
+      <div>
+        <div class="node-label">Elasticsearch (Docker)</div>
+        <div class="node-sub">JVM process · 4–8 GB RAM · log index storage</div>
+      </div>
+      <span class="pain-badge">⚠ 4–8 GB RAM</span>
+    </div>
+
+    <div class="stack-arrow">integration / log forwarding</div>
+
+    <div class="stack-node datadog">
+      <div class="node-icon">📡</div>
+      <div>
+        <div class="node-label">Datadog (SaaS)</div>
+        <div class="node-sub">Billed per host/month · logs billed per GB · no traces</div>
+      </div>
+      <span class="pain-badge">⚠ monthly SaaS fee</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- PAIN POINTS -->
+<div class="section-label">Pain Points</div>
+<div class="pain-grid">
+  <div class="pain-card">
+    <h4>High EC2 Memory Pressure</h4>
+    <p>Logstash + Elasticsearch are both JVM processes requiring 5–11 GB RAM combined — before your Rails app even starts. This forces larger (more expensive) EC2 instance sizes.</p>
+  </div>
+  <div class="pain-card">
+    <h4>Datadog Host Billing</h4>
+    <p>Datadog charges per host per month. Adding APM (traces) or Infrastructure Monitoring adds additional fees on top of the base host cost. Log ingest is billed separately per GB.</p>
+  </div>
+  <div class="pain-card">
+    <h4>Logs Only — No Traces or Metrics</h4>
+    <p>The pipeline carries only log data. There is no distributed tracing (no request waterfall), no application-level p99 latency or error rate counters, and no OTLP-native telemetry.</p>
+  </div>
+  <div class="pain-card">
+    <h4>Fragile File-Based Pipeline</h4>
+    <p>Log rotation, disk fill, and Logstash crashes create gaps in log history. The file-to-Logstash path has no backpressure mechanism — if Logstash falls behind, logs accumulate on disk.</p>
+  </div>
+</div>
+
+<!-- RAM TABLE -->
+<div class="section-label">Current Memory Footprint (EC2)</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:40px;">
+  <table class="res-table">
+    <thead><tr><th>Component</th><th>Runtime</th><th>Typical RAM</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Logstash</td><td>JVM</td><td style="color:var(--orange)">1–2 GB</td><td>Idle still consumes significant heap</td></tr>
+      <tr><td>Elasticsearch</td><td>JVM</td><td style="color:var(--red)">4–8 GB</td><td>Heap must be ≥ 50% available RAM</td></tr>
+      <tr><td>Rails (Puma)</td><td>Ruby</td><td>512 MB–1 GB</td><td>Depends on worker count</td></tr>
+      <tr class="total"><td>Total (pipeline alone)</td><td></td><td>5–11 GB</td><td>Before Rails, before OS overhead</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- OPTION A -->
+<div class="section-label">Option A — Grafana OSS Stack</div>
+<div class="option-wrap option-a">
+  <div class="option-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <span class="option-badge">OPTION A</span>
+        <h2>Grafana OSS (Loki + Tempo + Prometheus)</h2>
+      </div>
+      <p>Replace the entire pipeline with the standard OTEL-native Grafana stack. Five lightweight containers replace Logstash + Elasticsearch + Datadog.</p>
+    </div>
+  </div>
+  <div class="option-body">
+
+    <div class="opt-flow">
+      <div class="opt-node rails-opt">
+        <div><div class="n-label">Rails App</div><div class="n-sub">opentelemetry-ruby gem — sends OTLP directly</div></div>
+      </div>
+      <div class="opt-arrow">OTLP gRPC :4317</div>
+      <div class="opt-node collector">
+        <div><div class="n-label">OTEL Collector</div><div class="n-sub">Go binary · 50–150 MB RAM · also tails log file during migration</div></div>
+      </div>
+      <div class="opt-arrow">fan-out: logs → Loki · metrics → Prometheus · traces → Tempo</div>
+      <div class="opt-node backends-a">
+        <div>
+          <div class="n-label">Loki · Prometheus · Tempo</div>
+          <div class="n-sub">Logs (object storage / disk) · Metrics (TSDB) · Traces (object storage / disk)</div>
+        </div>
+      </div>
+      <div class="opt-arrow">unified datasources</div>
+      <div class="opt-node grafana">
+        <div><div class="n-label">Grafana</div><div class="n-sub">Dashboards · Alerting · Trace-to-log linking</div></div>
+      </div>
+    </div>
+
+    <div class="benefits-grid">
+      <div class="benefit"><h5>Memory: ~450 MB – 1.25 GB total</h5><p>vs 5–11 GB for Logstash + Elasticsearch. Frees RAM for your Rails workers.</p></div>
+      <div class="benefit"><h5>$0 SaaS cost</h5><p>All components are Apache 2.0 open source. Only EC2 instance cost.</p></div>
+      <div class="benefit"><h5>Full observability</h5><p>Traces via Tempo, metrics via Prometheus, logs via Loki — all three signals.</p></div>
+      <div class="benefit"><h5>Safe migration</h5><p>OTEL Collector tails the existing log file while Rails OTEL instrumentation is being added.</p></div>
+    </div>
+
+    <div class="section-label" style="margin-top:8px;">Container Footprint</div>
+    <div class="res-row">
+      <div class="res-chip">otel-collector<span>~100 MB</span></div>
+      <div class="res-chip">loki<span>~150 MB</span></div>
+      <div class="res-chip">prometheus<span>~150 MB</span></div>
+      <div class="res-chip">tempo<span>~150 MB</span></div>
+      <div class="res-chip">grafana<span>~150 MB</span></div>
+      <div class="res-chip" style="border-color:#1a4530;color:var(--green)">Total<span style="color:var(--green)">~700 MB</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- OPTION B -->
+<div class="section-label">Option B — SigNoz (All-in-One)</div>
+<div class="option-wrap option-b">
+  <div class="option-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <span class="option-badge">OPTION B</span>
+        <h2>SigNoz — Single Product, ClickHouse-backed</h2>
+      </div>
+      <p>Replace Logstash + Elasticsearch + Datadog with one Docker Compose deployment. OTEL native, all signals, one UI, zero SaaS fees.</p>
+    </div>
+  </div>
+  <div class="option-body">
+
+    <div class="opt-flow">
+      <div class="opt-node rails-opt">
+        <div><div class="n-label">Rails App</div><div class="n-sub">opentelemetry-ruby gem — same instrumentation as Option A</div></div>
+      </div>
+      <div class="opt-arrow">OTLP gRPC :4317</div>
+      <div class="opt-node signoz">
+        <div><div class="n-label">SigNoz OTel Collector</div><div class="n-sub">Built-in — receives traces, metrics, logs via OTLP</div></div>
+      </div>
+      <div class="opt-arrow">writes to ClickHouse</div>
+      <div class="opt-node clickhouse">
+        <div><div class="n-label">ClickHouse</div><div class="n-sub">Columnar DB · 10–20× less disk than Elasticsearch for same log volume</div></div>
+      </div>
+      <div class="opt-arrow">queried by</div>
+      <div class="opt-node signoz">
+        <div><div class="n-label">SigNoz UI</div><div class="n-sub">Traces · Metrics · Logs · Alerts — single interface, port 3301</div></div>
+      </div>
+    </div>
+
+    <div class="benefits-grid">
+      <div class="benefit" style="background:#0c1f35;border-color:#1a3a5c;"><h5 style="color:var(--accent)">Lowest complexity</h5><p>One product, one Docker Compose, one UI. No Grafana datasource wiring required.</p></div>
+      <div class="benefit" style="background:#0c1f35;border-color:#1a3a5c;"><h5 style="color:var(--accent)">ClickHouse storage</h5><p>Columnar storage costs 10–20× less than Elasticsearch shards for the same log volume.</p></div>
+      <div class="benefit" style="background:#0c1f35;border-color:#1a3a5c;"><h5 style="color:var(--accent)">Trace ↔ Log correlation</h5><p>Built-in — click a trace span to jump directly to correlated logs. No configuration needed.</p></div>
+      <div class="benefit" style="background:#0c1f35;border-color:#1a3a5c;"><h5 style="color:var(--accent)">One-line install</h5><p>Official Docker Compose from the SigNoz repo. Up and running in under 10 minutes.</p></div>
+    </div>
+
+    <div class="section-label" style="margin-top:8px;">Container Footprint</div>
+    <div class="res-row">
+      <div class="res-chip">signoz-collector<span>~150 MB</span></div>
+      <div class="res-chip">clickhouse<span>~750 MB</span></div>
+      <div class="res-chip">signoz-query<span>~150 MB</span></div>
+      <div class="res-chip">signoz-frontend<span>~75 MB</span></div>
+      <div class="res-chip">zookeeper<span>~150 MB</span></div>
+      <div class="res-chip" style="border-color:#1a3a5c;color:var(--accent)">Total<span style="color:var(--accent)">~1.3 GB</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- OPTION C -->
+<div class="section-label">Option C — Datadog (Production) + Self-hosted (Non-production)</div>
+<div class="option-wrap option-c">
+  <div class="option-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <span class="option-badge">OPTION C</span>
+        <h2>Hybrid — Best of Both Worlds</h2>
+      </div>
+      <p>Keep Datadog for production where its value is highest (incidents, SLOs, on-call, mobile app). Run a free self-hosted stack everywhere else. The OTEL Collector replaces Logstash in all environments, cutting 5–10 GB RAM from the pipeline regardless of the backend.</p>
+    </div>
+  </div>
+  <div class="option-body">
+
+    <div class="env-split">
+      <div class="env-block prod">
+        <div class="env-label">Production</div>
+        <div class="opt-flow">
+          <div class="opt-node rails-opt">
+            <div><div class="n-label">Rails App</div><div class="n-sub">opentelemetry-ruby — same gem</div></div>
+          </div>
+          <div class="opt-arrow">OTLP :4317</div>
+          <div class="opt-node collector">
+            <div><div class="n-label">OTEL Collector</div><div class="n-sub">otel-collector-config.production.yaml</div></div>
+          </div>
+          <div class="opt-arrow">datadog exporter</div>
+          <div class="opt-node" style="background:#1a0c2a;border-color:#4a1d7a;">
+            <div><div class="n-label" style="color:var(--purple)">Datadog</div><div class="n-sub">APM · Logs · Metrics · SLOs · Alerting</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="env-block nonprod">
+        <div class="env-label">Dev / Staging</div>
+        <div class="opt-flow">
+          <div class="opt-node rails-opt">
+            <div><div class="n-label">Rails App</div><div class="n-sub">same gem · different OTLP_ENDPOINT env var</div></div>
+          </div>
+          <div class="opt-arrow">OTLP :4317</div>
+          <div class="opt-node collector">
+            <div><div class="n-label">OTEL Collector</div><div class="n-sub">otel-collector-config.staging.yaml</div></div>
+          </div>
+          <div class="opt-arrow">otlp exporter</div>
+          <div class="opt-node signoz">
+            <div><div class="n-label">SigNoz (or Grafana OSS)</div><div class="n-sub">$0 cost · full traces + metrics + logs</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-top:4px;">Key Insight</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Rails instrumentation code is <strong style="color:var(--text)">identical in all environments</strong>. The only difference is one environment variable (<code style="font-family:var(--mono);color:var(--yellow);font-size:11px;">OTEL_EXPORTER_OTLP_ENDPOINT</code>) and which OTEL Collector config file is mounted. Developers get full observability locally; production keeps Datadog's incident management and SLO features.</p>
+
+    <div class="section-label">Production Collector Config</div>
+    <pre><span class="y-comment"># otel-collector-config.production.yaml</span>
+<span class="y-section">receivers:</span>
+  <span class="y-key">otlp:</span>
+    <span class="y-key">protocols:</span>
+      <span class="y-key">grpc:</span>
+        <span class="y-key">endpoint:</span> <span class="y-val">0.0.0.0:4317</span>
+      <span class="y-key">http:</span>
+        <span class="y-key">endpoint:</span> <span class="y-val">0.0.0.0:4318</span>
+
+<span class="y-section">exporters:</span>
+  <span class="y-key">datadog:</span>
+    <span class="y-key">api:</span>
+      <span class="y-key">site:</span> <span class="y-val">datadoghq.com</span>     <span class="y-comment"># or datadoghq.eu</span>
+      <span class="y-key">key:</span>  <span class="y-val">${DD_API_KEY}</span>
+
+<span class="y-section">service:</span>
+  <span class="y-key">pipelines:</span>
+    <span class="y-key">traces:</span>
+      <span class="y-key">receivers:</span>  <span class="y-val">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-val">[memory_limiter, resourcedetection, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-val">[datadog]</span>
+    <span class="y-key">metrics:</span>
+      <span class="y-key">receivers:</span>  <span class="y-val">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-val">[memory_limiter, resourcedetection, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-val">[datadog]</span>
+    <span class="y-key">logs:</span>
+      <span class="y-key">receivers:</span>  <span class="y-val">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-val">[memory_limiter, resourcedetection, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-val">[datadog]</span></pre>
+
+    <div class="section-label">Staging / Dev Collector Config</div>
+    <pre><span class="y-comment"># otel-collector-config.staging.yaml</span>
+<span class="y-section">exporters:</span>
+  <span class="y-key">otlp/signoz:</span>
+    <span class="y-key">endpoint:</span> <span class="y-val">signoz-otel-collector:4317</span>
+    <span class="y-key">tls:</span>
+      <span class="y-key">insecure:</span> <span class="y-val">true</span>
+
+<span class="y-section">service:</span>
+  <span class="y-key">pipelines:</span>
+    <span class="y-key">traces:</span>
+      <span class="y-key">receivers:</span>  <span class="y-val">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-val">[memory_limiter, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-val">[otlp/signoz]</span>
+    <span class="y-key">metrics:</span>
+      <span class="y-key">receivers:</span>  <span class="y-val">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-val">[memory_limiter, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-val">[otlp/signoz]</span>
+    <span class="y-key">logs:</span>
+      <span class="y-key">receivers:</span>  <span class="y-val">[otlp]</span>
+      <span class="y-key">processors:</span> <span class="y-val">[memory_limiter, batch]</span>
+      <span class="y-key">exporters:</span>  <span class="y-val">[otlp/signoz]</span></pre>
+
+    <div class="section-label">What Changes Per Environment</div>
+    <div class="res-row" style="flex-direction:column;gap:6px;">
+      <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--muted);width:240px;">OTEL_EXPORTER_OTLP_ENDPOINT</span>
+        <span style="color:var(--purple)">prod →</span>
+        <span style="color:var(--text)">http://otel-collector:4317</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--muted);width:240px;">OTEL_EXPORTER_OTLP_ENDPOINT</span>
+        <span style="color:var(--accent)">staging →</span>
+        <span style="color:var(--text)">http://otel-collector:4317</span>
+        <span style="color:var(--muted)">(same — collector config differs)</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--muted);width:240px;">Collector config mounted</span>
+        <span style="color:var(--purple)">prod →</span>
+        <span style="color:var(--text)">otel-collector-config.production.yaml</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--muted);width:240px;">Collector config mounted</span>
+        <span style="color:var(--accent)">staging →</span>
+        <span style="color:var(--text)">otel-collector-config.staging.yaml</span>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-top:16px;">Cost Impact</div>
+    <div class="benefits-grid">
+      <div class="benefit" style="background:#1a102a;border-color:#3d1d5a;"><h5 style="color:var(--purple)">Eliminate Logstash + Elasticsearch</h5><p>Free 5–10 GB RAM on production EC2. May allow a smaller (cheaper) instance type.</p></div>
+      <div class="benefit" style="background:#1a102a;border-color:#3d1d5a;"><h5 style="color:var(--purple)">Pay Datadog only for production</h5><p>Eliminate Datadog host fees for every dev and staging environment. Typically 2–3× fewer billed hosts.</p></div>
+      <div class="benefit" style="background:#1a102a;border-color:#3d1d5a;"><h5 style="color:var(--purple)">Developers get full observability</h5><p>SigNoz in dev means developers see traces, metrics, and logs locally — not just log lines.</p></div>
+      <div class="benefit" style="background:#1a102a;border-color:#3d1d5a;"><h5 style="color:var(--purple)">Production-grade tooling kept</h5><p>Datadog's incident timeline, SLO tracking, anomaly detection, and mobile app remain for on-call.</p></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- RAILS INSTRUMENTATION -->
+<div class="section-label">Rails Instrumentation — Same for All Options</div>
+<div class="rails-block">
+  <h3>// Gemfile</h3>
+  <pre style="margin-bottom:16px;"><span class="r-comment"># Gemfile</span>
+<span class="r-method">gem</span> <span class="r-str">'opentelemetry-sdk'</span>
+<span class="r-method">gem</span> <span class="r-str">'opentelemetry-exporter-otlp'</span>
+<span class="r-method">gem</span> <span class="r-str">'opentelemetry-instrumentation-all'</span>  <span class="r-comment"># auto-instruments Rails, ActiveRecord, Redis, Sidekiq…</span></pre>
+
+  <h3>// config/initializers/opentelemetry.rb</h3>
+  <pre><span class="r-kw">require</span> <span class="r-str">'opentelemetry/sdk'</span>
+<span class="r-kw">require</span> <span class="r-str">'opentelemetry/exporter/otlp'</span>
+<span class="r-kw">require</span> <span class="r-str">'opentelemetry/instrumentation/all'</span>
+
+<span class="r-const">OpenTelemetry</span>::<span class="r-const">SDK</span>.<span class="r-method">configure</span> <span class="r-kw">do</span> |c|
+  c.service_name    = <span class="r-const">ENV</span>.fetch(<span class="r-str">'OTEL_SERVICE_NAME'</span>, <span class="r-str">'rails-app'</span>)
+  c.service_version = <span class="r-const">ENV</span>.fetch(<span class="r-str">'OTEL_SERVICE_VERSION'</span>, <span class="r-str">'1.0.0'</span>)
+  c.<span class="r-method">use_all</span>   <span class="r-comment"># Rails, Action Pack, Active Record, Net::HTTP, Faraday, Redis, Sidekiq</span>
+  c.<span class="r-method">add_span_processor</span>(
+    <span class="r-const">OpenTelemetry</span>::<span class="r-const">SDK</span>::<span class="r-const">Trace</span>::<span class="r-const">Export</span>::<span class="r-const">BatchSpanProcessor</span>.<span class="r-method">new</span>(
+      <span class="r-const">OpenTelemetry</span>::<span class="r-const">Exporter</span>::<span class="r-const">OTLP</span>::<span class="r-const">Exporter</span>.<span class="r-method">new</span>(
+        endpoint: <span class="r-const">ENV</span>.fetch(<span class="r-str">'OTEL_EXPORTER_OTLP_ENDPOINT'</span>, <span class="r-str">'http://otel-collector:4317'</span>)
+      )
+    )
+  )
+<span class="r-kw">end</span></pre>
+
+  <h3 style="margin-top:16px;">// Auto-instrumented libraries</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+    <span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:#0d2318;border:1px solid #1a4530;color:var(--green)">Rails / Action Controller</span>
+    <span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:#0d2318;border:1px solid #1a4530;color:var(--green)">Active Record (SQL)</span>
+    <span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:#0d2318;border:1px solid #1a4530;color:var(--green)">Action View</span>
+    <span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:#0d2318;border:1px solid #1a4530;color:var(--green)">Net::HTTP</span>
+    <span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:#0d2318;border:1px solid #1a4530;color:var(--green)">Faraday</span>
+    <span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:#0d2318;border:1px solid #1a4530;color:var(--green)">Redis</span>
+    <span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:#0d2318;border:1px solid #1a4530;color:var(--green)">Sidekiq</span>
+    <span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:#0d2318;border:1px solid #1a4530;color:var(--green)">Rack</span>
+  </div>
+</div>
+
+<!-- MIGRATION -->
+<div class="section-label">Migration Path — No Hard Cutover</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:40px;">
+  <div class="phases">
+    <div class="phase">
+      <div class="phase-num">01</div>
+      <div class="phase-content">
+        <h4>Parallel run — validate new stack</h4>
+        <p>Run new and old pipeline simultaneously. OTEL Collector tails the existing log file alongside Logstash.</p>
+        <div class="phase-detail">
+          <div class="phase-step">Deploy new stack (Grafana OSS or SigNoz) alongside existing</div>
+          <div class="phase-step">Configure OTEL Collector filelog receiver to tail production.log</div>
+          <div class="phase-step">Verify logs appear correctly in Loki or SigNoz</div>
+        </div>
+      </div>
+    </div>
+    <div class="phase">
+      <div class="phase-num">02</div>
+      <div class="phase-content">
+        <h4>Add Rails OTEL instrumentation</h4>
+        <p>Add opentelemetry-ruby gems. Rails now sends OTLP directly — traces and metrics appear for the first time.</p>
+        <div class="phase-detail">
+          <div class="phase-step">Add gems, deploy initializer, set OTEL_EXPORTER_OTLP_ENDPOINT env var</div>
+          <div class="phase-step">Confirm traces, metrics, and logs all arrive in new stack</div>
+          <div class="phase-step">Build dashboards and alerts in Grafana or SigNoz</div>
+        </div>
+      </div>
+    </div>
+    <div class="phase">
+      <div class="phase-num">03</div>
+      <div class="phase-content">
+        <h4>Decommission old pipeline</h4>
+        <p>After 30 days of parity, shut down Logstash and Elasticsearch. What happens to Datadog depends on your chosen option.</p>
+        <div class="phase-detail">
+          <div class="phase-step">Stop and remove Logstash and Elasticsearch containers (all options)</div>
+          <div class="phase-step">Options A &amp; B: cancel Datadog subscription entirely</div>
+          <div class="phase-step">Option C: keep Datadog for production, remove from dev/staging only</div>
+          <div class="phase-step">Recover 5–11 GB RAM — downsize EC2 instance if appropriate</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARISON TABLE -->
+<div class="section-label">Side-by-Side Comparison</div>
+<div class="compare-wrap">
+  <table class="cmp-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th style="color:var(--red)">Current Stack</th>
+        <th style="color:var(--green)">Option A — Grafana OSS</th>
+        <th style="color:var(--accent)">Option B — SigNoz</th>
+        <th style="color:var(--purple)">Option C — Hybrid</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Log storage</td><td>Elasticsearch</td><td>Loki</td><td>ClickHouse</td><td>Datadog (prod) / ClickHouse (non-prod)</td></tr>
+      <tr><td>Trace storage</td><td><span class="check-no">❌ None</span></td><td>Tempo</td><td>ClickHouse</td><td>Datadog APM (prod) / ClickHouse (non-prod)</td></tr>
+      <tr><td>Metrics storage</td><td>Datadog only</td><td>Prometheus</td><td>ClickHouse</td><td>Datadog (prod) / ClickHouse (non-prod)</td></tr>
+      <tr><td>Log shipper</td><td>Logstash (JVM)</td><td>OTEL Collector (Go)</td><td>OTEL Collector (built-in)</td><td>OTEL Collector — all environments</td></tr>
+      <tr><td>Dashboards</td><td>Datadog</td><td>Grafana</td><td>SigNoz UI</td><td>Datadog (prod) / SigNoz (non-prod)</td></tr>
+      <tr><td>Alerting / on-call</td><td>Datadog</td><td>Grafana Alerts</td><td>SigNoz Alerts</td><td>Datadog (prod) / SigNoz (non-prod)</td></tr>
+      <tr><td>OTLP native</td><td><span class="check-no">❌ No</span></td><td><span class="check-yes">✅ Yes</span></td><td><span class="check-yes">✅ Yes</span></td><td><span class="check-yes">✅ Yes</span></td></tr>
+      <tr><td>Rails traces</td><td><span class="check-no">❌ No</span></td><td><span class="check-yes">✅ opentelemetry-ruby</span></td><td><span class="check-yes">✅ opentelemetry-ruby</span></td><td><span class="check-yes">✅ opentelemetry-ruby</span></td></tr>
+      <tr><td>Pipeline RAM</td><td><span style="color:var(--red)">5–11 GB</span></td><td><span style="color:var(--green)">~700 MB</span></td><td><span style="color:var(--green)">~1.3 GB</span></td><td><span style="color:var(--green)">~100 MB (prod) / ~1.4 GB (non-prod)</span></td></tr>
+      <tr><td>Prod SaaS cost</td><td><span style="color:var(--red)">Datadog host + log ingest</span></td><td><span class="check-yes">$0</span></td><td><span class="check-yes">$0</span></td><td style="color:var(--yellow)">Datadog production host only</td></tr>
+      <tr><td>Non-prod SaaS cost</td><td><span style="color:var(--red)">Datadog host per env</span></td><td><span class="check-yes">$0</span></td><td><span class="check-yes">$0</span></td><td><span class="check-yes">$0 (self-hosted)</span></td></tr>
+      <tr><td>Number of products</td><td>3</td><td>5</td><td>1</td><td>2 (Datadog prod / SigNoz non-prod)</td></tr>
+      <tr><td>Operational complexity</td><td>Medium</td><td>Medium–High</td><td>Low</td><td>Medium</td></tr>
+      <tr><td>S3 long-term storage</td><td><span class="check-no">❌ EBS only</span></td><td><span class="check-yes">✅ Loki + Tempo → S3</span></td><td><span class="check-warn">⚠️ ClickHouse disk</span></td><td style="color:var(--muted)">Datadog retention (prod) / ClickHouse (non-prod)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- DECISION -->
+<div class="section-label">Which to Choose</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:40px;">
+  <div class="dec-card a">
+    <h4>// Option A (Grafana OSS)</h4>
+    <ul>
+      <li>Team knows Grafana / PromQL</li>
+      <li>Widest OSS community</li>
+      <li>S3 retention for logs + traces</li>
+      <li>Grafana Cloud upgrade path</li>
+      <li>Adding Pyroscope profiling later</li>
+    </ul>
+  </div>
+  <div class="dec-card b">
+    <h4>// Option B (SigNoz)</h4>
+    <ul>
+      <li>Lowest operational complexity</li>
+      <li>No Grafana expertise needed</li>
+      <li>Trace-to-log correlation built-in</li>
+      <li>ClickHouse storage efficiency</li>
+      <li>Fastest time to observability</li>
+    </ul>
+  </div>
+  <div class="dec-card c">
+    <h4>// Option C (Hybrid)</h4>
+    <ul>
+      <li>Datadog required for production</li>
+      <li>Want to cut non-prod Datadog fees</li>
+      <li>Devs need full observability locally</li>
+      <li>Keep production incident tooling</li>
+      <li>Best cost/capability trade-off</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

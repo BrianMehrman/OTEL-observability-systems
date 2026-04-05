@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Non-Production Observability Options</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --teal: #2dd4bf;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 100px;
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+
+  header { border-left: 3px solid var(--orange); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--orange); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 700px; font-size: 13px; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 12px 16px; font-family: var(--mono); font-size: 10px; line-height: 1.8; overflow-x: auto; margin: 10px 0; }
+  .y-key { color: var(--accent); }
+  .y-val { color: var(--green); }
+  .y-str { color: var(--yellow); }
+  .y-comment { color: #334155; }
+  .y-section { color: var(--orange); font-weight: 600; }
+
+  /* ── CONTEXT BAR ── */
+  .context-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+  }
+  .ctx-block {
+    flex: 1;
+    min-width: 200px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .ctx-block.prod { background: #1a0c2a; border-color: #3d1d5a; border-left: 3px solid var(--purple); }
+  .ctx-block.lower { background: var(--surface); border-left: 3px solid var(--orange); }
+  .ctx-block .ctx-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; font-weight: 600; margin-bottom: 8px; }
+  .ctx-block.prod .ctx-label { color: var(--purple); }
+  .ctx-block.lower .ctx-label { color: var(--orange); }
+  .ctx-block h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .ctx-block p { font-size: 12px; color: var(--muted); }
+  .ctx-arrow { display: flex; align-items: center; color: var(--border); font-size: 24px; padding: 0 4px; }
+
+  /* ── TIER STRIP ── */
+  .tier-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 40px; }
+  .tier-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: var(--surface); }
+  .tier-card .t-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; font-weight: 600; margin-bottom: 8px; }
+  .tier-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .tier-card p { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .tier-card .t-needs { display: flex; flex-direction: column; gap: 4px; }
+  .tier-card .t-need { font-family: var(--mono); font-size: 10px; color: var(--muted); padding-left: 12px; position: relative; }
+  .tier-card .t-need::before { content: '·'; position: absolute; left: 0; }
+  .tier-local .t-label { color: var(--green); }
+  .tier-ci .t-label { color: var(--muted); }
+  .tier-staging .t-label { color: var(--accent); }
+  .tier-local { border-color: #1a4530; }
+  .tier-staging { border-color: #1a3a5c; }
+
+  /* ── OPTION CARDS ── */
+  .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px; }
+  .opt-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .opt-card .card-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .opt-card .card-head .head-left h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .opt-card .card-head .head-left p { font-size: 11px; color: var(--muted); }
+  .opt-card .card-body { padding: 18px 20px; }
+
+  .env-badge { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 9px; border-radius: 3px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+  .badge-dev { background: #0a1f14; color: var(--green); border: 1px solid #1a4530; }
+  .badge-staging { background: #0c1a2a; color: var(--accent); border: 1px solid #1a3a5c; }
+  .badge-both { background: #1a1208; color: var(--orange); border: 1px solid #3a2008; }
+
+  /* LGTM */
+  .card-lgtm .card-head { background: #0d1a20; }
+  .card-lgtm .card-head h3 { color: var(--teal); }
+  /* Jaeger */
+  .card-jaeger .card-head { background: #1a1208; }
+  .card-jaeger .card-head h3 { color: var(--orange); }
+  /* SigNoz */
+  .card-signoz .card-head { background: #0c1a2a; }
+  .card-signoz .card-head h3 { color: var(--accent); }
+  /* Grafana OSS */
+  .card-grafana .card-head { background: #0a1a14; }
+  .card-grafana .card-head h3 { color: var(--green); }
+  /* Uptrace */
+  .card-uptrace .card-head { background: #1a1020; }
+  .card-uptrace .card-head h3 { color: var(--purple); }
+
+  /* Signal tags */
+  .signal-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .sig { font-family: var(--mono); font-size: 9px; padding: 2px 7px; border-radius: 2px; font-weight: 600; }
+  .sig-t { background: #0c1f35; color: var(--accent); border: 1px solid #1a3a5c; }
+  .sig-m { background: #0a1f14; color: var(--green); border: 1px solid #1a4530; }
+  .sig-l { background: #1a1208; color: var(--orange); border: 1px solid #3a2810; }
+  .sig-none { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); text-decoration: line-through; }
+
+  /* Spec grid */
+  .spec-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-bottom: 14px; }
+  .spec-key { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .spec-val { font-family: var(--mono); font-size: 10px; color: var(--text); }
+  .spec-val.good { color: var(--green); }
+  .spec-val.warn { color: var(--yellow); }
+  .spec-val.muted { color: var(--muted); }
+
+  /* Pro/con */
+  .pro-con { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .pros, .cons { display: flex; flex-direction: column; gap: 4px; }
+  .pros .item, .cons .item { font-size: 11px; color: var(--muted); padding-left: 14px; position: relative; }
+  .pros .item::before { content: '✓'; position: absolute; left: 0; color: var(--green); }
+  .cons .item::before { content: '✗'; position: absolute; left: 0; color: var(--red); }
+
+  /* Ram bar */
+  .ram-bar-wrap { margin-bottom: 14px; }
+  .ram-label { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-bottom: 4px; }
+  .ram-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+  .ram-fill { height: 100%; border-radius: 3px; }
+
+  /* ── COMPARISON TABLE ── */
+  .cmp-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 40px; }
+  .cmp-table { width: 100%; border-collapse: collapse; }
+  .cmp-table th { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; background: var(--surface2); }
+  .cmp-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); vertical-align: middle; }
+  .cmp-table td:first-child { font-family: var(--mono); font-size: 10px; color: var(--text); font-weight: 600; }
+  .cmp-table tr:last-child td { border-bottom: none; }
+  .cmp-table tr:hover td { background: rgba(255,255,255,0.015); }
+  .c-yes { color: var(--green); font-family: var(--mono); font-size: 11px; }
+  .c-no { color: var(--red); font-family: var(--mono); font-size: 11px; }
+  .c-warn { color: var(--yellow); font-family: var(--mono); font-size: 11px; }
+  .env-pill { font-family: var(--mono); font-size: 9px; padding: 2px 7px; border-radius: 2px; }
+
+  /* ── RECOMMENDATION ── */
+  .rec-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 40px; }
+  .rec-card { border-radius: 8px; border: 1px solid var(--border); padding: 18px; }
+  .rec-card.local { background: #0a1f14; border-color: #1a4530; }
+  .rec-card.staging-card { background: #0c1a2a; border-color: #1a3a5c; }
+  .rec-card.prod-card { background: #1a0c2a; border-color: #3d1d5a; }
+  .rec-card .r-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; font-weight: 600; margin-bottom: 10px; }
+  .rec-card.local .r-label { color: var(--green); }
+  .rec-card.staging-card .r-label { color: var(--accent); }
+  .rec-card.prod-card .r-label { color: var(--purple); }
+  .rec-card h4 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .rec-card p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .rec-card .alt { font-family: var(--mono); font-size: 10px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }
+
+  /* ── COLLECTOR ROUTING ── */
+  .routing-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 40px; }
+  .routing-row { display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--border); }
+  .routing-row:last-child { border-bottom: none; }
+  .routing-env { padding: 16px; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; }
+  .routing-env .r-env { font-family: var(--mono); font-size: 10px; font-weight: 600; }
+  .routing-env .r-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .routing-config { padding: 14px 16px; }
+  .routing-config pre { margin: 0; }
+
+  @media (max-width: 760px) {
+    .options-grid, .tier-strip, .rec-grid { grid-template-columns: 1fr; }
+    .context-bar { flex-direction: column; }
+    .ctx-arrow { transform: rotate(90deg); }
+    .pro-con { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// Non-Production Observability</div>
+  <h1>Cheaper Options for Dev &amp; Staging<br><span style="color:var(--orange)">While Keeping Datadog in Production</span></h1>
+  <p>Production stays on Datadog. Lower environments use a self-hosted, zero-cost stack that receives the same OTEL telemetry. Only the OTEL Collector config changes per environment — Rails instrumentation code is identical everywhere.</p>
+</header>
+
+<!-- CONTEXT: PROD VS LOWER -->
+<div class="section-label">The Setup</div>
+<div class="context-bar">
+  <div class="ctx-block prod">
+    <div class="ctx-label">Production</div>
+    <h3>Datadog</h3>
+    <p>Unchanged. APM, SLOs, alerts, on-call, mobile app. Billed per host — one host only.</p>
+  </div>
+  <div class="ctx-arrow">→</div>
+  <div class="ctx-block lower">
+    <div class="ctx-label">Dev / Staging</div>
+    <h3>Self-hosted (pick one below)</h3>
+    <p>$0 cost. OTEL Collector routes to a different backend. Same Rails instrumentation as production.</p>
+  </div>
+</div>
+
+<!-- ENVIRONMENT TIERS -->
+<div class="section-label">Environment Tiers &amp; Requirements</div>
+<div class="tier-strip" style="margin-bottom:40px;">
+  <div class="tier-card tier-local">
+    <div class="t-label">Local Dev</div>
+    <h4>Developer Laptop / Docker</h4>
+    <p>Ephemeral. One developer. Instant startup. Restart = wipe is acceptable.</p>
+    <div class="t-needs">
+      <div class="t-need">Traces (debug request waterfalls)</div>
+      <div class="t-need">Single Docker container preferred</div>
+      <div class="t-need">Zero configuration</div>
+      <div class="t-need">Logs + metrics are a bonus</div>
+    </div>
+  </div>
+  <div class="tier-card tier-ci">
+    <div class="t-label">CI / Test</div>
+    <h4>GitHub Actions / CI Runner</h4>
+    <p>Ephemeral. No UI. Traces optional — used only to detect regressions.</p>
+    <div class="t-needs">
+      <div class="t-need">No persistent backend needed</div>
+      <div class="t-need">OTEL_SDK_DISABLED=true is valid</div>
+      <div class="t-need">Or: Jaeger all-in-one in CI service</div>
+      <div class="t-need">Traces recorded, rarely reviewed</div>
+    </div>
+  </div>
+  <div class="tier-card tier-staging">
+    <div class="t-label">Staging</div>
+    <h4>Shared EC2 — Always On</h4>
+    <p>Persistent. Shared by QA, devs, product. Should mirror production observability.</p>
+    <div class="t-needs">
+      <div class="t-need">All 3 signals (traces + metrics + logs)</div>
+      <div class="t-need">Survives container restarts</div>
+      <div class="t-need">Dashboards and alerting</div>
+      <div class="t-need">Trace-to-log correlation</div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION CARDS -->
+<div class="section-label">Options at a Glance</div>
+<div class="options-grid">
+
+  <!-- GRAFANA LGTM -->
+  <div class="opt-card card-lgtm">
+    <div class="card-head">
+      <div class="head-left">
+        <h3>Grafana LGTM</h3>
+        <p>grafana/otel-lgtm — one Docker image, everything included</p>
+      </div>
+      <span class="env-badge badge-dev">Local Dev</span>
+    </div>
+    <div class="card-body">
+      <div class="signal-row">
+        <span class="sig sig-t">TRACES</span>
+        <span class="sig sig-m">METRICS</span>
+        <span class="sig sig-l">LOGS</span>
+      </div>
+
+      <div class="ram-bar-wrap">
+        <div class="ram-label">RAM — ~400 MB (single container)</div>
+        <div class="ram-bar"><div class="ram-fill" style="width:14%;background:var(--teal);"></div></div>
+      </div>
+
+      <div class="spec-grid">
+        <div class="spec-key">Containers</div><div class="spec-val good">1</div>
+        <div class="spec-key">Persistence</div><div class="spec-val warn">In-memory (ephemeral)</div>
+        <div class="spec-key">OTEL Collector</div><div class="spec-val good">Not needed</div>
+        <div class="spec-key">UI</div><div class="spec-val">Grafana on :3000</div>
+        <div class="spec-key">Setup time</div><div class="spec-val good">&lt; 5 minutes</div>
+        <div class="spec-key">License</div><div class="spec-val">Apache 2.0</div>
+      </div>
+
+      <div class="pro-con">
+        <div class="pros">
+          <div class="item">Single image — docker compose up</div>
+          <div class="item">All 3 signals, zero config</div>
+          <div class="item">Real Grafana dashboards</div>
+          <div class="item">OTLP-native — no Collector needed</div>
+        </div>
+        <div class="cons">
+          <div class="item">Data lost on restart</div>
+          <div class="item">Not suitable for staging</div>
+          <div class="item">No persistent storage config</div>
+        </div>
+      </div>
+
+      <pre><span class="y-comment"># docker-compose.dev.yml</span>
+<span class="y-section">services:</span>
+  <span class="y-key">lgtm:</span>
+    <span class="y-key">image:</span> <span class="y-val">grafana/otel-lgtm:latest</span>
+    <span class="y-key">ports:</span>
+      <span class="y-val">- "3000:3000"</span>   <span class="y-comment"># Grafana UI</span>
+      <span class="y-val">- "4317:4317"</span>   <span class="y-comment"># OTLP gRPC</span>
+  <span class="y-key">rails:</span>
+    <span class="y-key">environment:</span>
+      <span class="y-key">OTEL_EXPORTER_OTLP_ENDPOINT:</span> <span class="y-val">http://lgtm:4317</span></pre>
+    </div>
+  </div>
+
+  <!-- JAEGER -->
+  <div class="opt-card card-jaeger">
+    <div class="card-head">
+      <div class="head-left">
+        <h3>Jaeger All-in-One</h3>
+        <p>jaegertracing/all-in-one — traces only, minimal footprint</p>
+      </div>
+      <span class="env-badge badge-dev">Local Dev</span>
+    </div>
+    <div class="card-body">
+      <div class="signal-row">
+        <span class="sig sig-t">TRACES</span>
+        <span class="sig sig-none">METRICS</span>
+        <span class="sig sig-none">LOGS</span>
+      </div>
+
+      <div class="ram-bar-wrap">
+        <div class="ram-label">RAM — ~150 MB (single container)</div>
+        <div class="ram-bar"><div class="ram-fill" style="width:6%;background:var(--orange);"></div></div>
+      </div>
+
+      <div class="spec-grid">
+        <div class="spec-key">Containers</div><div class="spec-val good">1</div>
+        <div class="spec-key">Persistence</div><div class="spec-val good">Badger (disk-backed)</div>
+        <div class="spec-key">OTEL Collector</div><div class="spec-val good">Not needed</div>
+        <div class="spec-key">UI</div><div class="spec-val">Jaeger on :16686</div>
+        <div class="spec-key">Version</div><div class="spec-val warn">Pin to v1.x — v2 breaks flags</div>
+        <div class="spec-key">Setup time</div><div class="spec-val good">&lt; 5 minutes</div>
+        <div class="spec-key">License</div><div class="spec-val">Apache 2.0</div>
+      </div>
+
+      <div class="pro-con">
+        <div class="pros">
+          <div class="item">Lightest possible option</div>
+          <div class="item">Excellent trace waterfall UI</div>
+          <div class="item">Disk-backed persistence</div>
+          <div class="item">Easiest to run in CI</div>
+        </div>
+        <div class="cons">
+          <div class="item">Traces only — no logs, no metrics</div>
+          <div class="item">Separate tool needed for metrics</div>
+          <div class="item">Not suitable for staging</div>
+        </div>
+      </div>
+
+      <pre><span class="y-comment"># docker-compose.dev.yml</span>
+<span class="y-comment"># ⚠ Pin to v1 — :latest now pulls v2 which removed these flags</span>
+<span class="y-section">services:</span>
+  <span class="y-key">jaeger:</span>
+    <span class="y-key">image:</span> <span class="y-val">jaegertracing/all-in-one:1.65.0</span>
+    <span class="y-key">ports:</span>
+      <span class="y-val">- "16686:16686"</span>  <span class="y-comment"># Jaeger UI</span>
+      <span class="y-val">- "4317:4317"</span>    <span class="y-comment"># OTLP gRPC</span>
+    <span class="y-key">environment:</span>
+      <span class="y-key">COLLECTOR_OTLP_ENABLED:</span> <span class="y-val">"true"</span>  <span class="y-comment"># v1 only flag</span>
+      <span class="y-key">SPAN_STORAGE_TYPE:</span> <span class="y-val">badger</span></pre>
+    </div>
+  </div>
+
+  <!-- SIGNOZ -->
+  <div class="opt-card card-signoz">
+    <div class="card-head">
+      <div class="head-left">
+        <h3>SigNoz</h3>
+        <p>Single product, ClickHouse-backed, all signals</p>
+      </div>
+      <span class="env-badge badge-staging">Staging</span>
+    </div>
+    <div class="card-body">
+      <div class="signal-row">
+        <span class="sig sig-t">TRACES</span>
+        <span class="sig sig-m">METRICS</span>
+        <span class="sig sig-l">LOGS</span>
+      </div>
+
+      <div class="ram-bar-wrap">
+        <div class="ram-label">RAM — ~850 MB – 1.7 GB (5 containers)</div>
+        <div class="ram-bar"><div class="ram-fill" style="width:55%;background:var(--accent);"></div></div>
+      </div>
+
+      <div class="spec-grid">
+        <div class="spec-key">Containers</div><div class="spec-val warn">5</div>
+        <div class="spec-key">Persistence</div><div class="spec-val good">ClickHouse on disk</div>
+        <div class="spec-key">OTEL Collector</div><div class="spec-val good">Built-in</div>
+        <div class="spec-key">UI</div><div class="spec-val">SigNoz on :3301</div>
+        <div class="spec-key">Setup time</div><div class="spec-val good">~10 minutes</div>
+        <div class="spec-key">License</div><div class="spec-val">Apache 2.0</div>
+      </div>
+
+      <div class="pro-con">
+        <div class="pros">
+          <div class="item">All 3 signals in one product</div>
+          <div class="item">Trace → log correlation built-in</div>
+          <div class="item">Persistent ClickHouse storage</div>
+          <div class="item">One-command install from git</div>
+        </div>
+        <div class="cons">
+          <div class="item">5 containers (more to manage)</div>
+          <div class="item">Heavier than Uptrace</div>
+          <div class="item">Zookeeper dependency</div>
+        </div>
+      </div>
+
+      <pre><span class="y-comment"># Official one-liner install</span>
+git clone -b main https://github.com/SigNoz/signoz.git
+cd signoz/deploy
+docker compose \
+  -f docker/clickhouse-setup/docker-compose.yaml up -d
+
+<span class="y-comment"># Rails env var</span>
+<span class="y-key">OTEL_EXPORTER_OTLP_ENDPOINT:</span> <span class="y-val">http://otel-collector:4317</span></pre>
+    </div>
+  </div>
+
+  <!-- GRAFANA OSS -->
+  <div class="opt-card card-grafana">
+    <div class="card-head">
+      <div class="head-left">
+        <h3>Grafana OSS Stack</h3>
+        <p>Loki + Tempo + Prometheus + Grafana — maximum flexibility</p>
+      </div>
+      <span class="env-badge badge-staging">Staging</span>
+    </div>
+    <div class="card-body">
+      <div class="signal-row">
+        <span class="sig sig-t">TRACES</span>
+        <span class="sig sig-m">METRICS</span>
+        <span class="sig sig-l">LOGS</span>
+      </div>
+
+      <div class="ram-bar-wrap">
+        <div class="ram-label">RAM — ~450 MB – 1.25 GB (5 containers)</div>
+        <div class="ram-bar"><div class="ram-fill" style="width:42%;background:var(--green);"></div></div>
+      </div>
+
+      <div class="spec-grid">
+        <div class="spec-key">Containers</div><div class="spec-val warn">5</div>
+        <div class="spec-key">Persistence</div><div class="spec-val good">Disk or S3</div>
+        <div class="spec-key">OTEL Collector</div><div class="spec-val good">Separate (fan-out)</div>
+        <div class="spec-key">UI</div><div class="spec-val">Grafana on :3000</div>
+        <div class="spec-key">Setup time</div><div class="spec-val warn">~30–60 minutes</div>
+        <div class="spec-key">License</div><div class="spec-val">Apache 2.0</div>
+      </div>
+
+      <div class="pro-con">
+        <div class="pros">
+          <div class="item">All 3 signals</div>
+          <div class="item">Team likely knows Grafana</div>
+          <div class="item">S3 storage for Loki + Tempo</div>
+          <div class="item">Widest ecosystem / plugins</div>
+        </div>
+        <div class="cons">
+          <div class="item">Most config of any option</div>
+          <div class="item">Trace → log link needs wiring</div>
+          <div class="item">5 separate configs to maintain</div>
+        </div>
+      </div>
+
+      <pre><span class="y-comment"># Collector fans out to all 3 backends</span>
+<span class="y-section">exporters:</span>
+  <span class="y-key">loki:</span>
+    <span class="y-key">endpoint:</span> <span class="y-val">http://loki:3100/loki/api/v1/push</span>
+  <span class="y-key">prometheusremotewrite:</span>
+    <span class="y-key">endpoint:</span> <span class="y-val">http://prometheus:9090/api/v1/write</span>
+  <span class="y-key">otlp/tempo:</span>
+    <span class="y-key">endpoint:</span> <span class="y-val">tempo:4317</span>
+    <span class="y-key">tls:</span>
+      <span class="y-key">insecure:</span> <span class="y-val">true</span></pre>
+    </div>
+  </div>
+
+  <!-- UPTRACE (full width) -->
+  <div class="opt-card card-uptrace" style="grid-column: span 2;">
+    <div class="card-head">
+      <div class="head-left">
+        <h3>Uptrace</h3>
+        <p>Lightweight APM — ClickHouse-backed, 2 containers, all signals. A lighter alternative to SigNoz for staging.</p>
+      </div>
+      <span class="env-badge badge-staging">Staging</span>
+    </div>
+    <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div class="signal-row">
+          <span class="sig sig-t">TRACES</span>
+          <span class="sig sig-m">METRICS</span>
+          <span class="sig sig-l">LOGS</span>
+        </div>
+
+        <div class="ram-bar-wrap">
+          <div class="ram-label">RAM — ~550 MB – 1.15 GB (2 containers)</div>
+          <div class="ram-bar"><div class="ram-fill" style="width:38%;background:var(--purple);"></div></div>
+        </div>
+
+        <div class="spec-grid">
+          <div class="spec-key">Containers</div><div class="spec-val good">2 (uptrace + clickhouse)</div>
+          <div class="spec-key">Persistence</div><div class="spec-val good">ClickHouse on disk</div>
+          <div class="spec-key">OTEL Collector</div><div class="spec-val good">Not required (OTLP direct)</div>
+          <div class="spec-key">UI</div><div class="spec-val">Uptrace on :14320</div>
+          <div class="spec-key">Trace → log link</div><div class="spec-val good">Built-in</div>
+          <div class="spec-key">License</div><div class="spec-val warn">BSL 1.1 (free to self-host)</div>
+        </div>
+
+        <div class="pro-con">
+          <div class="pros">
+            <div class="item">Only 2 containers</div>
+            <div class="item">All 3 signals</div>
+            <div class="item">Trace → log correlation built-in</div>
+            <div class="item">Lighter footprint than SigNoz</div>
+          </div>
+          <div class="cons">
+            <div class="item">Smaller community than SigNoz</div>
+            <div class="item">BSL license (not OSI open source)</div>
+            <div class="item">Less polished UI than SigNoz</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <pre style="font-size:10px;"><span class="y-comment"># docker-compose.staging.yml</span>
+<span class="y-section">services:</span>
+  <span class="y-key">uptrace:</span>
+    <span class="y-key">image:</span> <span class="y-val">uptrace/uptrace:latest</span>
+    <span class="y-key">ports:</span>
+      <span class="y-val">- "14317:14317"</span>  <span class="y-comment"># OTLP gRPC</span>
+      <span class="y-val">- "14318:14318"</span>  <span class="y-comment"># OTLP HTTP</span>
+      <span class="y-val">- "14320:14320"</span>  <span class="y-comment"># Uptrace UI</span>
+    <span class="y-key">volumes:</span>
+      <span class="y-val">- ./uptrace.yml:/etc/uptrace/uptrace.yml</span>
+    <span class="y-key">depends_on:</span> <span class="y-val">[clickhouse]</span>
+
+  <span class="y-key">clickhouse:</span>
+    <span class="y-key">image:</span> <span class="y-val">clickhouse/clickhouse-server:latest</span>
+    <span class="y-key">volumes:</span>
+      <span class="y-val">- ch-data:/var/lib/clickhouse</span>
+
+<span class="y-section">volumes:</span>
+  <span class="y-key">ch-data:</span>
+
+<span class="y-comment">---</span>
+<span class="y-comment"># Rails env var</span>
+<span class="y-key">OTEL_EXPORTER_OTLP_ENDPOINT:</span> <span class="y-val">http://uptrace:14317</span></pre>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end options-grid -->
+
+<!-- COMPARISON TABLE -->
+<div class="section-label">Side-by-Side Comparison</div>
+<div class="cmp-wrap">
+  <table class="cmp-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th style="color:var(--teal)">Grafana LGTM</th>
+        <th style="color:var(--orange)">Jaeger</th>
+        <th style="color:var(--accent)">SigNoz</th>
+        <th style="color:var(--green)">Grafana OSS</th>
+        <th style="color:var(--purple)">Uptrace</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Best environment</td>
+        <td><span class="env-pill" style="background:#0a1f14;color:var(--green);border:1px solid #1a4530;">local dev</span></td>
+        <td><span class="env-pill" style="background:#0a1f14;color:var(--green);border:1px solid #1a4530;">local dev</span></td>
+        <td><span class="env-pill" style="background:#0c1a2a;color:var(--accent);border:1px solid #1a3a5c;">staging</span></td>
+        <td><span class="env-pill" style="background:#0c1a2a;color:var(--accent);border:1px solid #1a3a5c;">staging</span></td>
+        <td><span class="env-pill" style="background:#0c1a2a;color:var(--accent);border:1px solid #1a3a5c;">staging</span></td>
+      </tr>
+      <tr>
+        <td>Traces</td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+      </tr>
+      <tr>
+        <td>Metrics</td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-no">❌ No</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+      </tr>
+      <tr>
+        <td>Logs</td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-no">❌ No</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+        <td><span class="c-yes">✅ Yes</span></td>
+      </tr>
+      <tr>
+        <td>Containers needed</td>
+        <td style="color:var(--green)">1</td>
+        <td style="color:var(--green)">1</td>
+        <td style="color:var(--yellow)">5</td>
+        <td style="color:var(--yellow)">5</td>
+        <td style="color:var(--green)">2</td>
+      </tr>
+      <tr>
+        <td>Approx RAM</td>
+        <td>~400 MB</td>
+        <td style="color:var(--green)">~150 MB</td>
+        <td style="color:var(--yellow)">~1.3 GB</td>
+        <td>~700 MB</td>
+        <td>~700 MB</td>
+      </tr>
+      <tr>
+        <td>Persistent storage</td>
+        <td><span class="c-no">❌ In-memory</span></td>
+        <td><span class="c-yes">✅ Badger/disk</span></td>
+        <td><span class="c-yes">✅ ClickHouse</span></td>
+        <td><span class="c-yes">✅ Disk or S3</span></td>
+        <td><span class="c-yes">✅ ClickHouse</span></td>
+      </tr>
+      <tr>
+        <td>OTEL Collector needed</td>
+        <td><span class="c-yes">✅ No (direct)</span></td>
+        <td><span class="c-yes">✅ No (direct)</span></td>
+        <td>Optional</td>
+        <td>Required</td>
+        <td>Optional</td>
+      </tr>
+      <tr>
+        <td>Trace → log link</td>
+        <td><span class="c-yes">✅ Built-in</span></td>
+        <td><span class="c-no">❌ None</span></td>
+        <td><span class="c-yes">✅ Built-in</span></td>
+        <td><span class="c-warn">⚠️ Config needed</span></td>
+        <td><span class="c-yes">✅ Built-in</span></td>
+      </tr>
+      <tr>
+        <td>Setup time</td>
+        <td style="color:var(--green)">&lt; 5 min</td>
+        <td style="color:var(--green)">&lt; 5 min</td>
+        <td style="color:var(--green)">~10 min</td>
+        <td style="color:var(--yellow)">~30–60 min</td>
+        <td style="color:var(--green)">~15 min</td>
+      </tr>
+      <tr>
+        <td>License</td>
+        <td>Apache 2.0</td>
+        <td>Apache 2.0</td>
+        <td>Apache 2.0</td>
+        <td>Apache 2.0</td>
+        <td style="color:var(--yellow)">BSL 1.1</td>
+      </tr>
+      <tr>
+        <td>SaaS cost</td>
+        <td style="color:var(--green)">$0</td>
+        <td style="color:var(--green)">$0</td>
+        <td style="color:var(--green)">$0</td>
+        <td style="color:var(--green)">$0</td>
+        <td style="color:var(--green)">$0</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- RECOMMENDATION -->
+<div class="section-label">Recommendation by Environment</div>
+<div class="rec-grid">
+  <div class="rec-card local">
+    <div class="r-label">Local Dev</div>
+    <h4>Grafana LGTM</h4>
+    <p>Single container. Zero config. All three signals. Real Grafana dashboards. Developers are up and running in under 5 minutes.</p>
+    <div class="alt">Alt: Jaeger All-in-One if traces are the only need and you want the absolute minimum footprint.</div>
+  </div>
+  <div class="rec-card staging-card">
+    <div class="r-label">Staging</div>
+    <h4>SigNoz</h4>
+    <p>All three signals. Persistent ClickHouse storage. Trace-to-log correlation built-in. Simplest all-in-one option for a shared staging environment. One Docker Compose, one UI.</p>
+    <div class="alt">Alt: Grafana OSS if the team already has Grafana expertise or wants S3 storage for logs and traces.</div>
+  </div>
+  <div class="rec-card prod-card">
+    <div class="r-label">Production</div>
+    <h4>Datadog — unchanged</h4>
+    <p>APM, SLOs, alerting, incident timeline, mobile app, anomaly detection. Full-featured production observability. Billed for one host only.</p>
+    <div class="alt">Same opentelemetry-ruby gems. OTEL Collector uses the datadog exporter with your DD_API_KEY.</div>
+  </div>
+</div>
+
+<!-- ROUTING CONFIG -->
+<div class="section-label">OTEL Collector Routing Per Environment</div>
+<div class="routing-wrap">
+
+  <div class="routing-row">
+    <div class="routing-env" style="background:#0a1f14;border-right-color:#1a4530;">
+      <div class="r-env" style="color:var(--green)">Local Dev</div>
+      <div class="r-sub">No Collector needed</div>
+    </div>
+    <div class="routing-config">
+      <pre><span class="y-comment"># docker-compose.dev.yml — Rails sends OTLP direct to Grafana LGTM</span>
+<span class="y-section">services:</span>
+  <span class="y-key">rails:</span>
+    <span class="y-key">environment:</span>
+      <span class="y-key">OTEL_RESOURCE_ATTRIBUTES:</span> <span class="y-val">"deployment.environment=development"</span>
+      <span class="y-key">OTEL_EXPORTER_OTLP_ENDPOINT:</span> <span class="y-val">http://lgtm:4317</span>
+  <span class="y-key">lgtm:</span>
+    <span class="y-key">image:</span> <span class="y-val">grafana/otel-lgtm:latest</span>
+    <span class="y-key">ports:</span> <span class="y-val">["3000:3000", "4317:4317", "4318:4318"]</span></pre>
+    </div>
+  </div>
+
+  <div class="routing-row">
+    <div class="routing-env" style="background:#0c1a2a;border-right-color:#1a3a5c;">
+      <div class="r-env" style="color:var(--accent)">Staging</div>
+      <div class="r-sub">OTEL Collector → SigNoz</div>
+    </div>
+    <div class="routing-config">
+      <pre><span class="y-comment"># otel-collector-config.staging.yaml</span>
+<span class="y-section">receivers:</span>
+  <span class="y-key">otlp:</span>
+    <span class="y-key">protocols:</span>
+      <span class="y-key">grpc:</span> <span class="y-val">{endpoint: 0.0.0.0:4317}</span>
+
+<span class="y-section">exporters:</span>
+  <span class="y-key">otlp/signoz:</span>
+    <span class="y-key">endpoint:</span> <span class="y-val">signoz-otel-collector:4317</span>
+    <span class="y-key">tls:</span> <span class="y-val">{insecure: true}</span>
+
+<span class="y-section">service:</span>
+  <span class="y-key">pipelines:</span>
+    <span class="y-key">traces:</span>   <span class="y-val">{receivers: [otlp], exporters: [otlp/signoz]}</span>
+    <span class="y-key">metrics:</span>  <span class="y-val">{receivers: [otlp], exporters: [otlp/signoz]}</span>
+    <span class="y-key">logs:</span>     <span class="y-val">{receivers: [otlp], exporters: [otlp/signoz]}</span></pre>
+    </div>
+  </div>
+
+  <div class="routing-row">
+    <div class="routing-env" style="background:#1a0c2a;border-right-color:#3d1d5a;">
+      <div class="r-env" style="color:var(--purple)">Production</div>
+      <div class="r-sub">OTEL Collector → Datadog</div>
+    </div>
+    <div class="routing-config">
+      <pre><span class="y-comment"># otel-collector-config.production.yaml</span>
+<span class="y-section">receivers:</span>
+  <span class="y-key">otlp:</span>
+    <span class="y-key">protocols:</span>
+      <span class="y-key">grpc:</span> <span class="y-val">{endpoint: 0.0.0.0:4317}</span>
+
+<span class="y-section">exporters:</span>
+  <span class="y-key">datadog:</span>
+    <span class="y-key">api:</span>
+      <span class="y-key">site:</span> <span class="y-val">datadoghq.com</span>
+      <span class="y-key">key:</span>  <span class="y-val">${DD_API_KEY}</span>
+
+<span class="y-section">service:</span>
+  <span class="y-key">pipelines:</span>
+    <span class="y-key">traces:</span>   <span class="y-val">{receivers: [otlp], exporters: [datadog]}</span>
+    <span class="y-key">metrics:</span>  <span class="y-val">{receivers: [otlp], exporters: [datadog]}</span>
+    <span class="y-key">logs:</span>     <span class="y-val">{receivers: [otlp], exporters: [datadog]}</span></pre>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTEL Kubernetes — Operator, DaemonSet & Auto-Instrumentation</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  header { border-left: 3px solid var(--accent); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 640px; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; font-family: var(--mono); font-size: 10px; line-height: 1.8; overflow-x: auto; margin-bottom: 20px; }
+  .y-key { color: var(--accent); }
+  .y-val { color: var(--green); }
+  .y-str { color: var(--yellow); }
+  .y-comment { color: #334155; }
+  .y-section { color: var(--orange); font-weight: 600; }
+  .e-key { color: var(--accent); }
+  .e-val { color: var(--green); }
+  .e-comment { color: #334155; }
+
+  /* ── CRD OVERVIEW ── */
+  .crd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 40px; }
+  .crd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .crd-header { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .crd-name { font-family: var(--mono); font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .crd-card.collector .crd-header { background: #0c1f35; }
+  .crd-card.collector .crd-name { color: var(--accent); }
+  .crd-card.instrumentation .crd-header { background: #0d2318; }
+  .crd-card.instrumentation .crd-name { color: var(--green); }
+  .crd-body { padding: 16px 20px; }
+  .crd-body p { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  .tag { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 3px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); display: inline-block; margin: 2px; }
+
+  /* ── INSTALL STEPS ── */
+  .steps { display: flex; flex-direction: column; gap: 0; margin-bottom: 40px; }
+  .step { display: flex; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .step:last-child { border-bottom: none; }
+  .step-num { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--border); flex-shrink: 0; width: 36px; text-align: right; }
+  .step-content h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .step-content p { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .install-cmd { background: var(--bg); border: 1px solid var(--border); border-left: 2px solid var(--green); border-radius: 4px; padding: 10px 14px; font-family: var(--mono); font-size: 10px; color: var(--green); line-height: 1.8; }
+
+  /* ── DEPLOYMENT MODES ── */
+  .modes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 40px; }
+  .mode-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .mode-header { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .mode-name { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .mode-badge { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-top: 4px; }
+  .mode-card.daemonset .mode-header { background: #0c1f35; }
+  .mode-card.daemonset .mode-name { color: var(--accent); }
+  .mode-card.daemonset .mode-badge { background: #0c2340; color: var(--accent); border: 1px solid #1a3a5c; }
+  .mode-card.deployment .mode-header { background: #1e0c40; }
+  .mode-card.deployment .mode-name { color: var(--purple); }
+  .mode-card.deployment .mode-badge { background: #280c40; color: var(--purple); border: 1px solid #3d1d7a; }
+  .mode-card.sidecar .mode-header { background: #1f1a08; }
+  .mode-card.sidecar .mode-name { color: var(--yellow); }
+  .mode-card.sidecar .mode-badge { background: #2a2208; color: var(--yellow); border: 1px solid #3d3210; }
+  .mode-body { padding: 14px 16px; }
+  .mode-body p { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .mode-body ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+  .mode-body li { font-size: 11px; color: var(--muted); padding-left: 12px; position: relative; }
+  .mode-body li::before { content: '→'; position: absolute; left: 0; color: var(--border); }
+
+  /* ── TOPOLOGY DIAGRAM ── */
+  .topology {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 24px;
+    margin-bottom: 40px;
+  }
+  .topo-cluster {
+    border: 1px solid #1a2a1a;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 14px;
+    background: #0a0f0a;
+  }
+  .topo-cluster-label { font-family: var(--mono); font-size: 10px; color: var(--green); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+  .topo-nodes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+  .topo-node {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: var(--surface);
+  }
+  .topo-node-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.08em; margin-bottom: 6px; }
+  .topo-pods { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .topo-pod { font-family: var(--mono); font-size: 9px; padding: 2px 7px; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; color: var(--muted); }
+  .topo-agent { font-family: var(--mono); font-size: 9px; padding: 3px 8px; background: #0c1f35; border: 1px solid #1a3a5c; border-radius: 3px; color: var(--accent); margin-top: 4px; }
+  .topo-arrow { text-align: center; color: var(--muted); font-size: 14px; margin: 6px 0; }
+  .topo-gateway {
+    border: 1px solid #3d1d7a;
+    border-radius: 6px;
+    padding: 12px 16px;
+    background: #1e0c40;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .topo-gateway .label { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--purple); }
+  .topo-gateway .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .topo-backends { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .topo-backend { text-align: center; padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  /* ── ANNOTATION TABLE ── */
+  .annot-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 12px; }
+  .annot-table th { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; }
+  .annot-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .annot-table td:first-child { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); }
+  .annot-table td:last-child { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .annot-table tr:last-child td { border-bottom: none; }
+  .annot-table tr:hover td { background: var(--surface); }
+
+  /* ── CHECKLIST ── */
+  .checklist { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 40px; }
+  .check-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .check-item:last-child { border-bottom: none; }
+  .check-box { width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 3px; flex-shrink: 0; background: var(--surface2); }
+  .check-text { font-size: 12px; color: var(--muted); }
+
+  /* ── SIZING TABLE ── */
+  .sizing-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 12px; }
+  .sizing-table th { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; }
+  .sizing-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .sizing-table td:first-child { color: var(--text); font-weight: 600; }
+  .sizing-table tr:last-child td { border-bottom: none; }
+  .sizing-table tr:hover td { background: var(--surface); }
+
+  .note { background: #0c1f10; border: 1px solid #1a4025; border-radius: 6px; padding: 16px 20px; font-size: 12px; color: #86efac; font-family: var(--mono); margin-bottom: 40px; }
+  .note strong { color: var(--green); }
+  .warn { background: #1f1208; border: 1px solid #3d2208; border-radius: 6px; padding: 16px 20px; font-size: 12px; color: #fcd34d; font-family: var(--mono); margin-bottom: 20px; }
+  .warn strong { color: var(--orange); }
+
+  @media (max-width: 700px) {
+    .crd-grid, .modes-grid, .topo-nodes, .topo-backends { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// Architecture Guide — Section 08</div>
+  <h1>Kubernetes: OTEL Operator,<br>DaemonSet & Auto-Instrumentation</h1>
+  <p>How to deploy OTEL natively in Kubernetes — using the Operator to manage Collectors and inject instrumentation into pods without touching application images.</p>
+</header>
+
+<!-- OPERATOR OVERVIEW -->
+<div class="section-label">The OTEL Operator — Two CRDs</div>
+<div class="crd-grid">
+
+  <div class="crd-card collector">
+    <div class="crd-header">
+      <div class="crd-name">OpenTelemetryCollector</div>
+    </div>
+    <div class="crd-body">
+      <p>Declares a Collector deployment. The Operator creates the underlying Deployment, DaemonSet, or Sidecar automatically — no need to write those manifests by hand.</p>
+      <span class="tag">mode: daemonset</span>
+      <span class="tag">mode: deployment</span>
+      <span class="tag">mode: sidecar</span>
+      <span class="tag">replicas</span>
+      <span class="tag">resources</span>
+    </div>
+  </div>
+
+  <div class="crd-card instrumentation">
+    <div class="crd-header">
+      <div class="crd-name">Instrumentation</div>
+    </div>
+    <div class="crd-body">
+      <p>Declares auto-instrumentation config (endpoint, sampler, propagators, per-language env vars). Referenced by pod annotations to inject instrumentation at admission time.</p>
+      <span class="tag">python</span>
+      <span class="tag">nodejs</span>
+      <span class="tag">java</span>
+      <span class="tag">go (eBPF)</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- INSTALL STEPS -->
+<div class="section-label">Installation</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:40px;">
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-content">
+        <h4>Install cert-manager (prerequisite)</h4>
+        <p>The Operator uses admission webhooks which require TLS certificates. cert-manager provisions them automatically.</p>
+        <div class="install-cmd">kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml<br><br>kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-content">
+        <h4>Install the OTEL Operator</h4>
+        <p>Deploys the Operator controller and registers the CRDs in the cluster.</p>
+        <div class="install-cmd">kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-content">
+        <h4>Verify</h4>
+        <div class="install-cmd">kubectl get pods -n opentelemetry-operator-system<br><span class="e-comment"># NAME                                     READY   STATUS<br># opentelemetry-operator-xxxxxxxxx-xxxxx   2/2     Running</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DEPLOYMENT MODES -->
+<div class="section-label">Collector Deployment Modes</div>
+<div class="modes-grid">
+
+  <div class="mode-card daemonset">
+    <div class="mode-header">
+      <div class="mode-name">DaemonSet</div>
+      <div class="mode-badge">mode: daemonset</div>
+    </div>
+    <div class="mode-body">
+      <p>One Collector pod per node. Receives traffic from all pods on that node, attaches k8s metadata, forwards to gateway.</p>
+      <ul>
+        <li>Per-node buffering and metadata enrichment</li>
+        <li>Low-latency local collection</li>
+        <li>k8sattributes processor reads local k8s API</li>
+        <li>Forwards upstream via OTLP</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mode-card deployment">
+    <div class="mode-header">
+      <div class="mode-name">Deployment (Gateway)</div>
+      <div class="mode-badge">mode: deployment</div>
+    </div>
+    <div class="mode-body">
+      <p>Scaled deployment. Handles expensive operations: tail sampling, PII scrubbing, fan-out to final backends.</p>
+      <ul>
+        <li>Horizontally scalable (HPA supported)</li>
+        <li>Tail-based sampling requires consistent routing</li>
+        <li>Routes per signal to separate backends</li>
+        <li>Use loadbalancingexporter from agents</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mode-card sidecar">
+    <div class="mode-header">
+      <div class="mode-name">Sidecar</div>
+      <div class="mode-badge">mode: sidecar</div>
+    </div>
+    <div class="mode-body">
+      <p>Injected into each pod as a container. For pods that need pod-local buffering or direct Collector access.</p>
+      <ul>
+        <li>Injected via pod annotation</li>
+        <li>Runs in the same pod network namespace</li>
+        <li>Highest isolation; highest resource cost</li>
+        <li>Forwards to DaemonSet or gateway</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<!-- TOPOLOGY DIAGRAM -->
+<div class="section-label">Cluster Topology</div>
+<div class="topology">
+  <div class="topo-cluster">
+    <div class="topo-cluster-label">☸ Kubernetes Cluster</div>
+    <div class="topo-nodes">
+      <div class="topo-node">
+        <div class="topo-node-label">Node 1</div>
+        <div class="topo-pods">
+          <span class="topo-pod">Pod A</span>
+          <span class="topo-pod">Pod B</span>
+        </div>
+        <div class="topo-agent">DaemonSet Agent</div>
+      </div>
+      <div class="topo-node">
+        <div class="topo-node-label">Node 2</div>
+        <div class="topo-pods">
+          <span class="topo-pod">Pod C</span>
+          <span class="topo-pod">Pod D</span>
+        </div>
+        <div class="topo-agent">DaemonSet Agent</div>
+      </div>
+      <div class="topo-node">
+        <div class="topo-node-label">Node 3</div>
+        <div class="topo-pods">
+          <span class="topo-pod">Pod E</span>
+          <span class="topo-pod">Pod F</span>
+        </div>
+        <div class="topo-agent">DaemonSet Agent</div>
+      </div>
+    </div>
+    <div class="topo-arrow">↓ OTLP (loadbalancingexporter — routes by trace_id)</div>
+    <div class="topo-gateway">
+      <div class="label">Gateway Collectors (Deployment × 3)</div>
+      <div class="sub">tail sampling · PII scrubbing · fan-out routing</div>
+    </div>
+  </div>
+  <div class="topo-arrow">↓</div>
+  <div class="topo-backends">
+    <div class="topo-backend" style="border-color:#1a3a5c;color:var(--accent);background:#0c1f35;">Tempo<br>(traces)</div>
+    <div class="topo-backend" style="border-color:#1a4530;color:var(--green);background:#0d2318;">Prometheus<br>(metrics)</div>
+    <div class="topo-backend" style="border-color:#3d3210;color:var(--yellow);background:#1f1a08;">Loki<br>(logs)</div>
+  </div>
+</div>
+
+<!-- AUTO-INSTRUMENTATION -->
+<div class="section-label">Auto-Instrumentation Injection</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:20px;">
+  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">The <code style="font-family:var(--mono);font-size:11px;color:var(--text)">Instrumentation</code> CRD defines what gets injected. Pod annotations tell the Operator which pods to target and in which language.</p>
+  <pre style="margin-bottom:16px;"><span class="y-section">apiVersion:</span> <span class="y-val">opentelemetry.io/v1alpha1</span>
+<span class="y-section">kind:</span> <span class="y-val">Instrumentation</span>
+<span class="y-section">metadata:</span>
+  <span class="y-key">name:</span> <span class="y-str">otel-instrumentation</span>
+  <span class="y-key">namespace:</span> <span class="y-str">my-app</span>
+<span class="y-section">spec:</span>
+  <span class="y-key">exporter:</span>
+    <span class="y-key">endpoint:</span> <span class="y-str">http://otel-agent-collector:4317</span>
+  <span class="y-key">propagators:</span> <span class="y-str">[tracecontext, baggage]</span>
+  <span class="y-key">sampler:</span>
+    <span class="y-key">type:</span> <span class="y-str">parentbased_traceidratio</span>
+    <span class="y-key">argument:</span> <span class="y-str">"0.1"</span></pre>
+</div>
+
+<table class="annot-table">
+  <thead>
+    <tr>
+      <th>Language</th>
+      <th>Pod Annotation</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Python</td>
+      <td>instrumentation.opentelemetry.io/inject-python: "my-app/otel-instrumentation"</td>
+      <td>Injects opentelemetry-distro init container</td>
+    </tr>
+    <tr>
+      <td>Node.js</td>
+      <td>instrumentation.opentelemetry.io/inject-nodejs: "my-app/otel-instrumentation"</td>
+      <td>Injects @opentelemetry/auto-instrumentations-node</td>
+    </tr>
+    <tr>
+      <td>Java</td>
+      <td>instrumentation.opentelemetry.io/inject-java: "my-app/otel-instrumentation"</td>
+      <td>Injects opentelemetry-javaagent.jar via JAVA_TOOL_OPTIONS</td>
+    </tr>
+    <tr>
+      <td>Go</td>
+      <td>instrumentation.opentelemetry.io/inject-go: "my-app/otel-instrumentation"</td>
+      <td>eBPF-based — requires Linux kernel ≥ 5.4 and privileged pod</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- YAML CONFIGS -->
+<div class="section-label">Agent DaemonSet Config (abridged)</div>
+<pre><span class="y-section">apiVersion:</span> <span class="y-val">opentelemetry.io/v1alpha1</span>
+<span class="y-section">kind:</span> <span class="y-val">OpenTelemetryCollector</span>
+<span class="y-section">metadata:</span>
+  <span class="y-key">name:</span> <span class="y-str">otel-agent</span>
+  <span class="y-key">namespace:</span> <span class="y-str">observability</span>
+<span class="y-section">spec:</span>
+  <span class="y-key">mode:</span> <span class="y-str">daemonset</span>
+  <span class="y-key">resources:</span>
+    <span class="y-key">limits:</span>
+      <span class="y-key">cpu:</span> <span class="y-str">200m</span>
+      <span class="y-key">memory:</span> <span class="y-str">256Mi</span>
+  <span class="y-key">config:</span> <span class="y-comment">|</span>
+    <span class="y-key">processors:</span>
+      <span class="y-key">k8sattributes:</span>
+        <span class="y-key">extract:</span>
+          <span class="y-key">metadata:</span>
+            <span class="y-str">- k8s.pod.name</span>
+            <span class="y-str">- k8s.namespace.name</span>
+            <span class="y-str">- k8s.deployment.name</span>
+            <span class="y-str">- k8s.node.name</span>
+    <span class="y-key">exporters:</span>
+      <span class="y-key">loadbalancing:</span>
+        <span class="y-key">resolver:</span>
+          <span class="y-key">k8s:</span>
+            <span class="y-key">service:</span> <span class="y-str">otel-gateway-collector</span>  <span class="y-comment"># routes by trace_id</span></pre>
+
+<div class="section-label">Gateway Deployment Config (abridged)</div>
+<pre><span class="y-section">spec:</span>
+  <span class="y-key">mode:</span> <span class="y-str">deployment</span>
+  <span class="y-key">replicas:</span> <span class="y-str">3</span>
+  <span class="y-key">resources:</span>
+    <span class="y-key">limits:</span>
+      <span class="y-key">cpu:</span> <span class="y-str">1000m</span>
+      <span class="y-key">memory:</span> <span class="y-str">2Gi</span>
+  <span class="y-key">config:</span> <span class="y-comment">|</span>
+    <span class="y-key">processors:</span>
+      <span class="y-key">tail_sampling:</span>
+        <span class="y-key">decision_wait:</span> <span class="y-str">10s</span>
+        <span class="y-key">policies:</span>
+          <span class="y-str">- name: errors-always</span>
+            <span class="y-key">type:</span> <span class="y-str">status_code</span>
+          <span class="y-str">- name: slow-always</span>
+            <span class="y-key">type:</span> <span class="y-str">latency</span>
+          <span class="y-str">- name: baseline</span>
+            <span class="y-key">type:</span> <span class="y-str">probabilistic</span>
+            <span class="y-key">probabilistic:</span> <span class="y-str">{sampling_percentage: 10}</span>
+    <span class="y-key">exporters:</span>
+      <span class="y-key">otlp/tempo:</span>
+        <span class="y-key">endpoint:</span> <span class="y-str">tempo:4317</span>
+      <span class="y-key">prometheusremotewrite:</span>
+        <span class="y-key">endpoint:</span> <span class="y-str">http://prometheus:9090/api/v1/write</span>
+      <span class="y-key">loki:</span>
+        <span class="y-key">endpoint:</span> <span class="y-str">http://loki:3100/loki/api/v1/push</span></pre>
+
+<!-- SIZING TABLE -->
+<div class="section-label">Resource Sizing Guidelines</div>
+<table class="sizing-table">
+  <thead>
+    <tr><th>Tier</th><th>CPU request</th><th>CPU limit</th><th>Memory request</th><th>Memory limit</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>DaemonSet agent</td><td>50m</td><td>200m</td><td>64Mi</td><td>256Mi</td></tr>
+    <tr><td>Gateway (per replica)</td><td>250m</td><td>1000m</td><td>512Mi</td><td>2Gi</td></tr>
+    <tr><td>Sidecar</td><td>25m</td><td>100m</td><td>32Mi</td><td>128Mi</td></tr>
+  </tbody>
+</table>
+
+<div class="warn"><strong>Tail sampling constraint:</strong> All spans for a given trace must arrive at the same gateway replica. Use the loadbalancingexporter in the agent tier to route by trace_id — do not use a round-robin load balancer on the gateway service for the traces pipeline.</div>
+
+<!-- CHECKLIST -->
+<div class="section-label">Deployment Checklist</div>
+<div class="checklist">
+  <div class="check-item"><div class="check-box"></div><div class="check-text">cert-manager installed and all pods Ready</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">OTEL Operator installed and running</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">observability namespace created</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">DaemonSet OpenTelemetryCollector applied</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">Gateway OpenTelemetryCollector applied (mode: deployment)</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">RBAC ClusterRole + ClusterRoleBinding for k8sattributes applied</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">Instrumentation resource created per namespace</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">Pod annotations added for each instrumented language</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">Spans visible in backend with k8s.pod.name and k8s.namespace.name attributes</div></div>
+  <div class="check-item"><div class="check-box"></div><div class="check-text">Gateway HPA configured and scaling tested</div></div>
+</div>
+
+<div class="note"><strong>Next:</strong> Review Section 06 (Ecosystem) for backend choices to wire into the gateway exporters, and Section 04 (Sampling) for tail sampling policy design.</div>
+
+</body>
+</html>

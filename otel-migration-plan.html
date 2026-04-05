@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Migration Plan — Logstash → Elasticsearch → Datadog to OTEL</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #181e2e;
+    --border: #232b40;
+    --accent: #4f9cf9;
+    --green: #3ecf8e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --yellow: #fcd34d;
+    --teal: #2dd4bf;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 40px 24px 100px;
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+
+  header { border-left: 3px solid var(--teal); padding-left: 20px; margin-bottom: 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--teal); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+  header h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  header p { margin-top: 10px; color: var(--muted); max-width: 680px; font-size: 13px; }
+
+  /* ── TIMELINE LAYOUT ── */
+  .timeline { position: relative; padding-left: 56px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 12px;
+    bottom: 80px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--teal), var(--border));
+  }
+
+  .phase-block { position: relative; margin-bottom: 56px; }
+  .phase-dot {
+    position: absolute;
+    left: -46px;
+    top: 10px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    z-index: 2;
+  }
+  .phase-dot.active { border-color: var(--teal); color: var(--teal); background: #081a18; }
+  .phase-dot.current { border-color: var(--red); color: var(--red); background: #1a0808; }
+  .phase-dot.branch { border-color: var(--purple); color: var(--purple); background: #140a22; }
+
+  .phase-header { margin-bottom: 20px; }
+  .phase-header .phase-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .phase-header h2 { font-size: 20px; font-weight: 700; }
+  .phase-header p { font-size: 12px; color: var(--muted); margin-top: 4px; max-width: 640px; }
+
+  /* ── PIPELINE DIAGRAM ── */
+  .pipeline-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .pipeline-flow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+  .pipe-node-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+  }
+  .pipe-node {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    min-width: 130px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .pipe-node .node-name { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); }
+  .pipe-node .node-detail { font-size: 10px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+  .pipe-node .node-status {
+    position: absolute;
+    top: -8px;
+    right: 8px;
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-weight: 600;
+  }
+
+  /* Status variants */
+  .status-running { background: var(--surface2); border-color: var(--border); }
+  .status-running .node-status { background: #0d1a0d; color: var(--green); border: 1px solid #1a3a1a; }
+
+  .status-new { background: #0a1f14; border-color: #1a4530; box-shadow: 0 0 12px rgba(62,207,142,0.12); }
+  .status-new .node-name { color: var(--green); }
+  .status-new .node-status { background: #0a1f14; color: var(--green); border: 1px solid #1a4530; }
+
+  .status-parallel { background: #1a1208; border-color: #3a2810; }
+  .status-parallel .node-name { color: var(--orange); }
+  .status-parallel .node-status { background: #1a1208; color: var(--orange); border: 1px solid #3a2810; }
+
+  .status-retiring { background: #1a1208; border-color: #3a2008; opacity: 0.85; }
+  .status-retiring .node-name { color: var(--orange); }
+  .status-retiring .node-status { background: #1a1208; color: var(--orange); border: 1px solid #3a2008; }
+
+  .status-removed {
+    background: var(--bg);
+    border-color: var(--border);
+    border-style: dashed;
+    opacity: 0.4;
+  }
+  .status-removed .node-name { text-decoration: line-through; color: var(--muted); }
+  .status-removed .node-status { background: #1a0808; color: var(--red); border: 1px solid #3a1010; }
+
+  .status-prod { background: #1a0c2a; border-color: #3d1d5a; box-shadow: 0 0 10px rgba(167,139,250,0.1); }
+  .status-prod .node-name { color: var(--purple); }
+  .status-prod .node-status { background: #1a0c2a; color: var(--purple); border: 1px solid #3d1d5a; }
+
+  /* Arrows */
+  .pipe-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--border);
+    font-size: 14px;
+    padding-top: 14px;
+    flex-shrink: 0;
+    gap: 0;
+  }
+  .pipe-arrow.new-path { color: var(--green); }
+  .pipe-arrow.retiring { color: var(--orange); opacity: 0.5; }
+  .pipe-arrow.removed { color: var(--border); opacity: 0.3; }
+  .pipe-arrow.prod { color: var(--purple); }
+
+  /* Vertical split for parallel flows */
+  .pipeline-stack { display: flex; flex-direction: column; gap: 12px; }
+  .pipeline-row { display: flex; align-items: flex-start; gap: 0; }
+  .flow-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .flow-label.new { color: var(--green); }
+  .flow-label.old { color: var(--orange); }
+  .flow-label.prod { color: var(--purple); }
+  .flow-label.staging { color: var(--accent); }
+
+  .flow-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+
+  /* ── CHANGES CALLOUT ── */
+  .changes-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .change-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .change-chip.added { background: #0a1f14; border: 1px solid #1a4530; color: var(--green); }
+  .change-chip.retiring { background: #1a1208; border: 1px solid #3a2008; color: var(--orange); }
+  .change-chip.removed { background: #1a0808; border: 1px solid #3a1010; color: var(--red); }
+  .change-chip.unchanged { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); }
+
+  /* ── INFO BOX ── */
+  .info-box {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--teal);
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .info-box h4 { font-family: var(--mono); font-size: 10px; color: var(--teal); margin-bottom: 8px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .info-box p { font-size: 12px; color: var(--muted); }
+
+  /* ── PHASE 3 BRANCH ── */
+  .branch-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .branch-card { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .branch-card .branch-header { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .branch-card .branch-header .branch-tag { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+  .branch-card .branch-header h3 { font-size: 14px; font-weight: 700; }
+  .branch-card .branch-body { padding: 16px; }
+
+  .branch-ab .branch-header { background: #081a18; }
+  .branch-ab .branch-tag { color: var(--green); }
+  .branch-c .branch-header { background: #140a22; }
+  .branch-c .branch-tag { color: var(--purple); }
+
+  /* ── STATUS LEGEND ── */
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .legend-swatch { width: 28px; height: 16px; border-radius: 3px; border: 1px solid; }
+
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; font-family: var(--mono); font-size: 10px; line-height: 1.8; overflow-x: auto; margin: 10px 0; }
+  .y-key { color: var(--accent); }
+  .y-val { color: var(--green); }
+  .y-comment { color: #334155; }
+  .y-section { color: var(--orange); font-weight: 600; }
+
+  /* ── TIMELINE TABLE ── */
+  .tl-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+  .tl-table th { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left; background: var(--surface2); }
+  .tl-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 10px; }
+  .tl-table td:first-child { color: var(--text); }
+  .tl-table tr:last-child td { border-bottom: none; }
+  .t-running { color: var(--green); }
+  .t-new { color: var(--teal); font-weight: 600; }
+  .t-retiring { color: var(--orange); }
+  .t-removed { color: var(--red); text-decoration: line-through; }
+  .t-kept { color: var(--purple); }
+
+  /* ── ROLLBACK BOX ── */
+  .rollback-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .rollback-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
+  .rollback-card h4 { font-family: var(--mono); font-size: 10px; color: var(--text); margin-bottom: 8px; }
+  .rollback-card p { font-size: 11px; color: var(--muted); }
+  .rollback-card .risk { font-family: var(--mono); font-size: 9px; margin-top: 8px; padding: 2px 6px; border-radius: 3px; display: inline-block; }
+  .rollback-card .risk.zero { background: #0a1f14; color: var(--green); border: 1px solid #1a4530; }
+  .rollback-card .risk.low { background: #1a1808; color: var(--yellow); border: 1px solid #3a3010; }
+
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  @media (max-width: 760px) {
+    .branch-wrap, .rollback-grid { grid-template-columns: 1fr; }
+    .pipeline-flow { flex-direction: column; }
+    .pipe-arrow { transform: rotate(90deg); padding: 8px 0; }
+    .timeline { padding-left: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">// Migration Plan</div>
+  <h1>Logstash → Elasticsearch → Datadog<br><span style="color:var(--teal)">→ OTEL-Native</span></h1>
+  <p>A phased, parallel-run migration strategy. The old pipeline runs untouched until each phase is validated. No hard cutover, no log gaps, rollback available at every step.</p>
+</header>
+
+<!-- LEGEND -->
+<div class="section-label" style="margin-bottom:12px;">Component Status Legend</div>
+<div class="legend" style="margin-bottom:40px;">
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--surface2);border-color:var(--border);"></div>RUNNING (unchanged)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#0a1f14;border-color:#1a4530;"></div>NEW (just added)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#1a1208;border-color:#3a2008;"></div>RETIRING (still running, will be removed)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--bg);border-color:var(--border);border-style:dashed;opacity:0.5;"></div>REMOVED</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#1a0c2a;border-color:#3d1d5a;"></div>PROD-ONLY (Option C)</div>
+</div>
+
+<!-- TIMELINE -->
+<div class="timeline">
+
+  <!-- PHASE 0 -->
+  <div class="phase-block">
+    <div class="phase-dot current">0</div>
+    <div class="phase-header">
+      <div class="phase-tag">// Phase 0 — Baseline</div>
+      <h2>Current State</h2>
+      <p>All log data flows through file → Logstash → Elasticsearch → Datadog. No traces, no application metrics. Pipeline consumes 5–11 GB RAM before Rails even starts.</p>
+    </div>
+
+    <div class="pipeline-wrap">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:14px;letter-spacing:0.1em;">SIGNAL COVERAGE: LOGS ONLY</div>
+      <div class="pipeline-flow">
+        <div class="pipe-node-wrap">
+          <div class="pipe-node status-running">
+            <div class="node-status">RUNNING</div>
+            <div class="node-name">Rails App</div>
+            <div class="node-detail">Puma · writes to log file</div>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node-wrap">
+          <div class="pipe-node status-running">
+            <div class="node-status">RUNNING</div>
+            <div class="node-name">Log File</div>
+            <div class="node-detail">/var/log/rails/production.log</div>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node-wrap">
+          <div class="pipe-node status-running">
+            <div class="node-status">RUNNING</div>
+            <div class="node-name">Logstash</div>
+            <div class="node-detail">JVM · 1–2 GB RAM</div>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node-wrap">
+          <div class="pipe-node status-running">
+            <div class="node-status">RUNNING</div>
+            <div class="node-name">Elasticsearch</div>
+            <div class="node-detail">JVM · 4–8 GB RAM</div>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node-wrap">
+          <div class="pipe-node status-running">
+            <div class="node-status">RUNNING</div>
+            <div class="node-name">Datadog</div>
+            <div class="node-detail">SaaS · per-host billing</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="changes-row">
+      <div class="change-chip unchanged">● Rails — logs only</div>
+      <div class="change-chip unchanged">● Logstash — 1–2 GB RAM</div>
+      <div class="change-chip unchanged">● Elasticsearch — 4–8 GB RAM</div>
+      <div class="change-chip unchanged">● Datadog — SaaS fee</div>
+    </div>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div class="phase-block">
+    <div class="phase-dot active">1</div>
+    <div class="phase-header">
+      <div class="phase-tag">// Phase 1 — Parallel Ingest</div>
+      <h2>Install OTEL Collector — No Rails Changes</h2>
+      <p>Deploy the OTEL Collector and point its <code style="font-family:var(--mono);font-size:11px;color:var(--yellow)">filelog</code> receiver at the same log file Logstash reads. Both pipelines run simultaneously. Rails code is untouched.</p>
+    </div>
+
+    <div class="pipeline-wrap">
+      <div class="pipeline-stack">
+
+        <div>
+          <div class="flow-label old">Old pipeline — still running unchanged</div>
+          <div class="pipeline-flow">
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-running">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">Rails App</div>
+                <div class="node-detail">unchanged</div>
+              </div>
+            </div>
+            <div class="pipe-arrow retiring">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-running">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">Log File</div>
+                <div class="node-detail">read by both pipelines</div>
+              </div>
+            </div>
+            <div class="pipe-arrow retiring">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-running">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">Logstash</div>
+                <div class="node-detail">unchanged</div>
+              </div>
+            </div>
+            <div class="pipe-arrow retiring">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-running">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">Elasticsearch</div>
+                <div class="node-detail">unchanged</div>
+              </div>
+            </div>
+            <div class="pipe-arrow retiring">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-running">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">Datadog</div>
+                <div class="node-detail">unchanged</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-divider"></div>
+
+        <div>
+          <div class="flow-label new">New pipeline — filelog receiver tailing same log file</div>
+          <div class="pipeline-flow">
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">NEW</div>
+                <div class="node-name">OTEL Collector</div>
+                <div class="node-detail">filelog receiver · ~100 MB RAM</div>
+              </div>
+            </div>
+            <div class="pipe-arrow new-path">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">NEW</div>
+                <div class="node-name">New Backend</div>
+                <div class="node-detail">Loki/Grafana · SigNoz · or Datadog (C)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="changes-row">
+      <div class="change-chip added">+ OTEL Collector (filelog)</div>
+      <div class="change-chip added">+ New backend deployed</div>
+      <div class="change-chip unchanged">● Old pipeline untouched</div>
+    </div>
+
+    <div class="info-box" style="margin-top:12px;">
+      <h4>// filelog receiver config (Phase 1)</h4>
+      <pre><span class="y-section">receivers:</span>
+  <span class="y-key">filelog:</span>
+    <span class="y-key">include:</span> <span class="y-val">[/var/log/rails/production.log]</span>
+    <span class="y-key">operators:</span>
+      <span class="y-key">- type:</span> <span class="y-val">json_parser</span>  <span class="y-comment"># if using lograge JSON format</span>
+        <span class="y-key">timestamp:</span>
+          <span class="y-key">parse_from:</span> <span class="y-val">attributes.time</span>
+          <span class="y-key">layout:</span> <span class="y-val">"%Y-%m-%dT%H:%M:%S.%LZ"</span></pre>
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">Goal: validate logs appear correctly in the new backend before making any Rails code changes.</p>
+    </div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase-block">
+    <div class="phase-dot active">2</div>
+    <div class="phase-header">
+      <div class="phase-tag">// Phase 2 — Native OTLP from Rails</div>
+      <h2>Add opentelemetry-ruby Gems</h2>
+      <p>Rails now sends OTLP directly to the OTEL Collector. Traces and metrics appear for the first time. The old file-based pipeline continues running as a comparison baseline.</p>
+    </div>
+
+    <div class="pipeline-wrap">
+      <div class="pipeline-stack">
+
+        <div>
+          <div class="flow-label new">New path — Rails sends OTLP (traces + metrics + logs)</div>
+          <div class="pipeline-flow">
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">UPDATED</div>
+                <div class="node-name">Rails App</div>
+                <div class="node-detail">otel gems added · sends OTLP</div>
+              </div>
+            </div>
+            <div class="pipe-arrow new-path">──OTLP──→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">OTEL Collector</div>
+                <div class="node-detail">otlp + filelog receivers</div>
+              </div>
+            </div>
+            <div class="pipe-arrow new-path">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">GAINING TRACES</div>
+                <div class="node-name">New Backend</div>
+                <div class="node-detail">now receives all 3 signals</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-divider"></div>
+
+        <div>
+          <div class="flow-label" style="color:var(--orange);">Old pipeline — still running as baseline (will retire in Phase 3)</div>
+          <div class="pipeline-flow">
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-retiring">
+                <div class="node-status">RETIRING</div>
+                <div class="node-name">Log File</div>
+                <div class="node-detail">still written, still tailed</div>
+              </div>
+            </div>
+            <div class="pipe-arrow retiring">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-retiring">
+                <div class="node-status">RETIRING</div>
+                <div class="node-name">Logstash</div>
+                <div class="node-detail">comparison baseline</div>
+              </div>
+            </div>
+            <div class="pipe-arrow retiring">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-retiring">
+                <div class="node-status">RETIRING</div>
+                <div class="node-name">Elasticsearch</div>
+                <div class="node-detail">comparison baseline</div>
+              </div>
+            </div>
+            <div class="pipe-arrow retiring">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-retiring">
+                <div class="node-status">RETIRING</div>
+                <div class="node-name">Datadog</div>
+                <div class="node-detail">comparison baseline</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="changes-row">
+      <div class="change-chip added">+ opentelemetry-sdk gem</div>
+      <div class="change-chip added">+ opentelemetry-exporter-otlp gem</div>
+      <div class="change-chip added">+ opentelemetry-instrumentation-all gem</div>
+      <div class="change-chip added">+ config/initializers/opentelemetry.rb</div>
+      <div class="change-chip retiring">⚠ Logstash — retiring</div>
+      <div class="change-chip retiring">⚠ Elasticsearch — retiring</div>
+      <div class="change-chip retiring">⚠ Datadog — retiring (or prod-only)</div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:12px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--teal);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:10px;">// Signals gained in this phase</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:3px;background:#0a1f14;border:1px solid #1a4530;color:var(--green)">Traces — every Rails request</div>
+        <div style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:3px;background:#0a1f14;border:1px solid #1a4530;color:var(--green)">SQL query spans</div>
+        <div style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:3px;background:#0a1f14;border:1px solid #1a4530;color:var(--green)">Redis spans</div>
+        <div style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:3px;background:#0a1f14;border:1px solid #1a4530;color:var(--green)">Outbound HTTP spans</div>
+        <div style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:3px;background:#0a1f14;border:1px solid #1a4530;color:var(--green)">Sidekiq job spans</div>
+        <div style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:3px;background:#0a1f14;border:1px solid #1a4530;color:var(--green)">p99 latency metrics</div>
+        <div style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:3px;background:#0a1f14;border:1px solid #1a4530;color:var(--green)">Error rate counters</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="phase-block">
+    <div class="phase-dot branch">3</div>
+    <div class="phase-header">
+      <div class="phase-tag">// Phase 3 — Decommission</div>
+      <h2>Remove Legacy Components (Choose Your Path)</h2>
+      <p>After 30 days of parity — same logs, new stack stable, dashboards and alerts built — shut down the legacy pipeline. The path you take depends on which option you chose.</p>
+    </div>
+
+    <div class="branch-wrap" style="margin-bottom:20px;">
+
+      <!-- Path A/B -->
+      <div class="branch-card branch-ab">
+        <div class="branch-header">
+          <div class="branch-tag">Option A (Grafana OSS) or Option B (SigNoz)</div>
+          <h3>Full Replacement — No Datadog</h3>
+        </div>
+        <div class="branch-body">
+          <div class="flow-label new" style="margin-bottom:10px;">Final state — all environments</div>
+
+          <div class="pipeline-flow" style="margin-bottom:16px;">
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">Rails App</div>
+                <div class="node-detail">OTLP to Collector</div>
+              </div>
+            </div>
+            <div class="pipe-arrow new-path">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">OTEL Collector</div>
+                <div class="node-detail">only remaining shipper</div>
+              </div>
+            </div>
+            <div class="pipe-arrow new-path">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">PRIMARY</div>
+                <div class="node-name">Loki/Grafana<br>— or SigNoz</div>
+                <div class="node-detail">traces + metrics + logs</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--red);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;">Removed</div>
+            <div class="pipeline-flow" style="gap:8px;">
+              <div class="pipe-node status-removed" style="min-width:100px;">
+                <div class="node-status">REMOVED</div>
+                <div class="node-name">Logstash</div>
+              </div>
+              <div class="pipe-node status-removed" style="min-width:100px;">
+                <div class="node-status">REMOVED</div>
+                <div class="node-name">Elasticsearch</div>
+              </div>
+              <div class="pipe-node status-removed" style="min-width:100px;">
+                <div class="node-status">REMOVED</div>
+                <div class="node-name">Datadog</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="change-chip removed">− Logstash removed</div>
+            <div class="change-chip removed">− Elasticsearch removed</div>
+            <div class="change-chip removed">− Datadog subscription</div>
+            <div class="change-chip added">✓ 5–11 GB RAM freed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Path C -->
+      <div class="branch-card branch-c">
+        <div class="branch-header">
+          <div class="branch-tag">Option C — Hybrid</div>
+          <h3>Datadog (Prod) + Self-hosted (Non-prod)</h3>
+        </div>
+        <div class="branch-body">
+
+          <div class="flow-label prod" style="margin-bottom:8px;">Production</div>
+          <div class="pipeline-flow" style="margin-bottom:14px;">
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">Rails App</div>
+                <div class="node-detail">OTLP</div>
+              </div>
+            </div>
+            <div class="pipe-arrow prod">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">OTEL Collector</div>
+                <div class="node-detail">datadog exporter</div>
+              </div>
+            </div>
+            <div class="pipe-arrow prod">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-prod">
+                <div class="node-status">PROD ONLY</div>
+                <div class="node-name">Datadog</div>
+                <div class="node-detail">APM · SLOs · on-call</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-label staging" style="margin-bottom:8px;">Dev / Staging</div>
+          <div class="pipeline-flow" style="margin-bottom:14px;">
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">Rails App</div>
+                <div class="node-detail">same gem</div>
+              </div>
+            </div>
+            <div class="pipe-arrow new-path">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">OTEL Collector</div>
+                <div class="node-detail">signoz exporter</div>
+              </div>
+            </div>
+            <div class="pipe-arrow new-path">→</div>
+            <div class="pipe-node-wrap">
+              <div class="pipe-node status-new">
+                <div class="node-status">RUNNING</div>
+                <div class="node-name">SigNoz</div>
+                <div class="node-detail">$0 cost</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--red);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;">Removed from all environments</div>
+            <div class="pipeline-flow" style="gap:8px;">
+              <div class="pipe-node status-removed" style="min-width:100px;">
+                <div class="node-status">REMOVED</div>
+                <div class="node-name">Logstash</div>
+              </div>
+              <div class="pipe-node status-removed" style="min-width:100px;">
+                <div class="node-status">REMOVED</div>
+                <div class="node-name">Elasticsearch</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="change-chip removed">− Logstash all envs</div>
+            <div class="change-chip removed">− Elasticsearch all envs</div>
+            <div class="change-chip removed">− Datadog non-prod</div>
+            <div class="change-chip added">✓ 5–11 GB RAM freed</div>
+            <div class="change-chip added">✓ 2–3× fewer DD hosts</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- end timeline -->
+
+<!-- COMPONENT STATUS ACROSS PHASES TABLE -->
+<div class="section-label">Component Status Across All Phases</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:40px;">
+  <table class="tl-table">
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Phase 0 — Current</th>
+        <th>Phase 1 — Collector Added</th>
+        <th>Phase 2 — OTEL Gems</th>
+        <th>Phase 3A/B (Full OSS)</th>
+        <th>Phase 3C (Hybrid)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Rails App</td>
+        <td class="t-running">Running</td>
+        <td class="t-running">Running</td>
+        <td class="t-new">+ OTEL gems</td>
+        <td class="t-running">Running</td>
+        <td class="t-running">Running</td>
+      </tr>
+      <tr>
+        <td>Log File on Disk</td>
+        <td class="t-running">Active</td>
+        <td class="t-running">Active (both read it)</td>
+        <td class="t-retiring">Active (retiring)</td>
+        <td class="t-removed">Removed</td>
+        <td class="t-removed">Removed</td>
+      </tr>
+      <tr>
+        <td>Logstash</td>
+        <td class="t-running">Running</td>
+        <td class="t-running">Running</td>
+        <td class="t-retiring">Running (retiring)</td>
+        <td class="t-removed">Removed</td>
+        <td class="t-removed">Removed</td>
+      </tr>
+      <tr>
+        <td>Elasticsearch</td>
+        <td class="t-running">Running</td>
+        <td class="t-running">Running</td>
+        <td class="t-retiring">Running (retiring)</td>
+        <td class="t-removed">Removed</td>
+        <td class="t-removed">Removed</td>
+      </tr>
+      <tr>
+        <td>Datadog</td>
+        <td class="t-running">Running</td>
+        <td class="t-running">Running</td>
+        <td class="t-retiring">Running (retiring)</td>
+        <td class="t-removed">Removed</td>
+        <td class="t-kept">Production only</td>
+      </tr>
+      <tr>
+        <td>OTEL Collector</td>
+        <td style="color:var(--border)">—</td>
+        <td class="t-new">New (filelog)</td>
+        <td class="t-new">New (otlp + filelog)</td>
+        <td class="t-running">Running</td>
+        <td class="t-running">Running (all envs)</td>
+      </tr>
+      <tr>
+        <td>New Backend</td>
+        <td style="color:var(--border)">—</td>
+        <td class="t-new">New (logs only)</td>
+        <td class="t-new">New (all 3 signals)</td>
+        <td class="t-running">Primary</td>
+        <td class="t-running">Non-prod primary</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ROLLBACK -->
+<div class="section-label">Rollback at Every Phase</div>
+<div class="rollback-grid" style="margin-bottom:40px;">
+  <div class="rollback-card">
+    <h4>Phase 1 Rollback</h4>
+    <p>Stop and remove the OTEL Collector containers. The old pipeline was never modified — it never stopped running.</p>
+    <div class="risk zero">Risk: Zero</div>
+  </div>
+  <div class="rollback-card">
+    <h4>Phase 2 Rollback</h4>
+    <p>Remove the OTEL gems from Gemfile and redeploy. Logstash and Elasticsearch are still running. Log gap: none.</p>
+    <div class="risk zero">Risk: Zero</div>
+  </div>
+  <div class="rollback-card">
+    <h4>Phase 3 Rollback</h4>
+    <p>Restart Logstash and Elasticsearch containers. OTEL Collector continues. Rollback is possible as long as the Elasticsearch volume is not deleted.</p>
+    <div class="risk low">Risk: Low (keep volume)</div>
+  </div>
+</div>
+
+<!-- TIMELINE ESTIMATE -->
+<div class="section-label">Estimated Timeline</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:40px;">
+  <table class="tl-table">
+    <thead>
+      <tr><th>Phase</th><th>Duration</th><th>Work required</th><th>Risk</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Phase 1 — Deploy Collector</td><td style="color:var(--text)">1–3 days</td><td style="color:var(--muted)">Deploy OTEL Collector container, write filelog config, verify logs appear in new backend</td><td style="color:var(--green)">None</td></tr>
+      <tr><td>Phase 2 — Add OTEL Gems</td><td style="color:var(--text)">3–5 days</td><td style="color:var(--muted)">Add 3 gems, write initializer, set env var, validate traces and metrics appear</td><td style="color:var(--green)">Very low</td></tr>
+      <tr><td>Phase 2 — Parity Check</td><td style="color:var(--text)">2–4 weeks</td><td style="color:var(--muted)">Build dashboards and alerts in new stack. Compare log parity old vs new. Validate alerting works.</td><td style="color:var(--yellow)">Low</td></tr>
+      <tr><td>Phase 3 — Decommission</td><td style="color:var(--text)">1 day</td><td style="color:var(--muted)">Stop Logstash + Elasticsearch. Cancel Datadog (or remove from non-prod). Reclaim RAM.</td><td style="color:var(--yellow)">Low (keep ES volume temporarily)</td></tr>
+      <tr><td style="color:var(--text);font-weight:600;">Total</td><td style="color:var(--teal);font-weight:600;">~5–7 weeks</td><td style="color:var(--muted)">Safe parallel migration, no hard cutover</td><td style="color:var(--green)">Low throughout</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>
