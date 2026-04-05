@@ -314,5 +314,9 @@ Health check endpoints are typically polled every few seconds. Without filtering
 
 ## What's Next
 
-- **[04 — Sampling]** — Tail-based sampling policy design, volume calculations, error coverage guarantees
-- **[05 — Distributed Tracing]** — Context propagation and trace correlation across services
+- **[04 — Sampling](otel-sampling.md)** — Tail-based sampling policy design, volume calculations, error coverage guarantees
+- **[05 — Distributed Tracing](otel-distributed.md)** — Context propagation and trace correlation across services
+
+---
+
+[← Back to Guide Index](otel-overview.md)

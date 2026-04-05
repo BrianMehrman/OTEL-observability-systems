@@ -185,3 +185,14 @@ There is no point of no return until you cancel the Datadog subscription or dele
 | Phase 3 (parity check) | 30 days | Compare old vs new, build dashboards and alerts |
 | Phase 3 (decommission) | 1 day | Remove containers, cancel subscriptions |
 | **Total** | **~6 weeks** | Safe, parallel migration |
+
+---
+
+## Related Guides
+
+- **[Rails Stack Analysis](otel-rails-stack.md)** — Options A/B/C for the Rails pipeline
+- **[Non-Prod Options](otel-nonprod-options.md)** — Detailed comparison of dev/staging backends
+- **[Distributed System Migration](otel-distributed-migration.md)** — Full polyglot stack migration guide
+- **[03 — Collector](otel-collector.md)** — OTEL Collector pipeline and config reference
+
+[← Back to Guide Index](otel-overview.md)

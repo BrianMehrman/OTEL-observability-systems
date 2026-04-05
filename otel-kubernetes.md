@@ -574,6 +574,10 @@ exporters:
 
 ## What's Next
 
-- Review **[06 — Ecosystem]** for backend and SaaS platform choices that work with this topology
-- Review **[04 — Sampling]** for tail sampling policy design to run in your gateway tier
-- Review **[03 — Collector]** for the full processor and exporter reference
+- **[06 — Ecosystem](otel-ecosystem.md)** — Backend and SaaS platform choices that work with this topology
+- **[04 — Sampling](otel-sampling.md)** — Tail sampling policy design for the gateway tier
+- **[03 — Collector](otel-collector.md)** — Full processor and exporter reference
+
+---
+
+[← Back to Guide Index](otel-overview.md)

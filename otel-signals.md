@@ -192,6 +192,10 @@ This workflow — **alert on metrics → investigate with traces → read detail
 
 ## What's Next
 
-- **[03 — The Collector]** — Pipeline config, processors, and exporter routing
-- **[04 — Sampling]** — Controlling trace volume without losing important signals
-- **[05 — Distributed Tracing]** — How trace context crosses service boundaries
+- **[03 — The Collector](otel-collector.md)** — Pipeline config, processors, and exporter routing
+- **[04 — Sampling](otel-sampling.md)** — Controlling trace volume without losing important signals
+- **[05 — Distributed Tracing](otel-distributed.md)** — How trace context crosses service boundaries
+
+---
+
+[← Back to Guide Index](otel-overview.md)

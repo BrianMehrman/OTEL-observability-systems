@@ -631,3 +631,15 @@ storage:
 ```
 
 S3 Standard costs ~$0.023/GB/month. Elasticsearch on EBS typically costs ~$0.10/GB/month — roughly 4× more expensive for cold log storage.
+
+---
+
+## Related Guides
+
+- **[Migration Plan](otel-migration-plan.md)** — Phase-by-phase migration from Logstash → OTEL
+- **[Non-Prod Options](otel-nonprod-options.md)** — Detailed comparison of dev/staging backends
+- **[Distributed System Migration](otel-distributed-migration.md)** — Full polyglot stack migration guide
+- **[03 — Collector](otel-collector.md)** — OTEL Collector pipeline and config reference
+- **[06 — Ecosystem](otel-ecosystem.md)** — Backend and SaaS platform landscape
+
+[← Back to Guide Index](otel-overview.md)

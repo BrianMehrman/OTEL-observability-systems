@@ -169,9 +169,20 @@ Decision is made *after the trace completes*, in the Collector. Rules can be def
 
 ---
 
-## What's Next
+## Guide Index
 
-- **[02 — The Three Signals]** — When to use traces vs. metrics vs. logs, and how to instrument each
-- **[03 — The Collector]** — Full config YAML walkthrough, processor recipes
-- **[04 — Sampling]** — Designing sampling rules for real workloads
-- **[05 — Distributed Tracing]** — Context propagation, service graphs, and trace correlation
+| # | Guide | Description |
+|---|-------|-------------|
+| 01 | **[Overview](otel-overview.md)** ← you are here | Architecture map, signals intro, key decisions |
+| 02 | **[The Three Signals](otel-signals.md)** | Traces vs. metrics vs. logs — when and how to instrument each |
+| 03 | **[The Collector](otel-collector.md)** | Pipeline config, processor recipes, exporter routing |
+| 04 | **[Sampling](otel-sampling.md)** | Head vs. tail sampling, volume control, error coverage |
+| 05 | **[Distributed Tracing](otel-distributed.md)** | Context propagation, W3C TraceContext, B3, service graphs |
+| 06 | **[Ecosystem](otel-ecosystem.md)** | Backend tools, SaaS platforms, OSS stack recommendations |
+| 07 | **[Language SDKs](otel-sdks.md)** | Setup guides for Python, Node.js, Go, Java |
+| 08 | **[Kubernetes](otel-kubernetes.md)** | OTEL Operator, DaemonSet, auto-instrumentation |
+| 09 | **[Tools Reference](otel-tools.md)** | Instrumentation libs, backends, platforms comparison tables |
+| — | **[Rails Stack Analysis](otel-rails-stack.md)** | Modernizing a Rails log pipeline — Options A, B, and C |
+| — | **[Migration Plan](otel-migration-plan.md)** | Phase-by-phase migration from Logstash → Elasticsearch → Datadog to OTEL |
+| — | **[Non-Prod Options](otel-nonprod-options.md)** | Dev/staging backends: Grafana LGTM, SigNoz, Uptrace, Jaeger |
+| — | **[Distributed System Migration](otel-distributed-migration.md)** | Polyglot stack (Rails + Sidekiq + Java + Node.js + messaging) migration guide |
