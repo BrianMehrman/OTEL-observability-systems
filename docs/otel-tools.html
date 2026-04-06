@@ -290,6 +290,60 @@
         <td><span class="lic-oss license">Apache 2.0</span></td>
       </tr>
       <tr>
+        <td>AWS X-Ray SDK <span style="font-size:10px;background:rgba(239,68,68,.15);color:#ef4444;padding:1px 5px;border-radius:3px;margin-left:4px;">⚠️ proprietary format</span></td>
+        <td class="vendor">Amazon</td>
+        <td>Java, Python, Node.js, Go, .NET, Ruby</td>
+        <td><span class="tag tag-t">T</span></td>
+        <td><span class="otlp-no">❌ X-Ray format (no OTLP)</span></td>
+        <td>✅ Partial</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Apache SkyWalking Agent</td>
+        <td class="vendor">Apache</td>
+        <td>Java, .NET, Node.js, Go, Python, PHP</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-no">❌ SW8 protocol</span></td>
+        <td>✅ Yes (Java bytecode)</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Telegraf</td>
+        <td class="vendor">InfluxData</td>
+        <td>Plugin-based (300+ sources, any language)</td>
+        <td><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes (OTLP output plugin)</span></td>
+        <td>❌ Config-based, not code</td>
+        <td><span class="lic-oss license">MIT</span></td>
+      </tr>
+      <tr>
+        <td>Instana Agent</td>
+        <td class="vendor">IBM</td>
+        <td>Java, Node.js, Python, Ruby, .NET, Go, PHP</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>✅ Yes (bytecode injection)</td>
+        <td><span class="lic-com license">Commercial</span></td>
+      </tr>
+      <tr>
+        <td>Grafana Beyla <span style="font-size:10px;background:rgba(79,156,249,.15);color:var(--accent);padding:1px 5px;border-radius:3px;margin-left:4px;">eBPF</span></td>
+        <td class="vendor">Grafana Labs</td>
+        <td>Go, Java, Python, Node.js, Ruby, .NET, Rust</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>✅ Zero-code (eBPF)</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Glowroot</td>
+        <td class="vendor">Community</td>
+        <td>Java</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>✅ Yes (Java agent)</td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
         <td>Sentry SDK</td>
         <td class="vendor">Sentry</td>
         <td>30+ languages</td>
@@ -382,6 +436,62 @@
         <td style="font-family:var(--mono);font-size:12px;">~50–100 MB</td>
         <td><span style="color:var(--muted);font-size:13px;">⚠️ Needs Operator</span></td>
         <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Promtail</strong></td>
+        <td>Log collector for Loki (Grafana stack)</td>
+        <td><span class="otlp-no">❌ Loki push API only</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~20 MB</td>
+        <td><span style="color:var(--orange);font-size:13px;">⚠️ Common in Grafana/Loki stacks</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Grafana Alloy</strong></td>
+        <td>Next-gen collector — replaces Promtail + Agent patterns</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~100 MB</td>
+        <td><span style="color:var(--muted);font-size:13px;">❌ Needs deployment</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Filebeat</strong></td>
+        <td>Lightweight log shipper (Elastic Beats family)</td>
+        <td><span class="otlp-yes">✅ Yes</span> <span style="font-size:11px;color:var(--muted);">(OTLP output plugin)</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~50 MB</td>
+        <td><span style="color:var(--muted);font-size:13px;">❌ No</span></td>
+        <td><span class="lic-com license">Elastic License</span></td>
+      </tr>
+      <tr>
+        <td><strong>Metricbeat / Beats</strong></td>
+        <td>System + service metrics (Elastic Beats family)</td>
+        <td><span class="otlp-yes">✅ Yes</span> <span style="font-size:11px;color:var(--muted);">(OTLP output plugin)</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~50 MB</td>
+        <td><span style="color:var(--muted);font-size:13px;">❌ No</span></td>
+        <td><span class="lic-com license">Elastic License</span></td>
+      </tr>
+      <tr>
+        <td><strong>AWS FireLens</strong></td>
+        <td>Log router for Fargate/ECS (Fluent Bit wrapper)</td>
+        <td><span class="otlp-yes">✅ Via Fluent Bit</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">Serverless</td>
+        <td><span style="color:var(--green);font-size:13px;">✅ Fargate/ECS only</span></td>
+        <td><span class="lic-com license">AWS managed</span></td>
+      </tr>
+      <tr>
+        <td><strong>rsyslog / syslog-ng</strong></td>
+        <td>System log daemon and forwarder</td>
+        <td><span class="otlp-no">❌ No</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">Minimal (system daemon)</td>
+        <td><span style="color:var(--green);font-size:13px;">✅ Linux systems</span></td>
+        <td><span class="lic-oss license">GPLv3 / LGPL</span></td>
+      </tr>
+      <tr>
+        <td><strong>Splunk Universal Forwarder</strong></td>
+        <td>Lightweight log shipper to Splunk</td>
+        <td><span class="otlp-no">❌ Splunk protocol</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~50 MB</td>
+        <td><span style="color:var(--muted);font-size:13px;">❌ No</span></td>
+        <td><span class="lic-com license">Proprietary</span></td>
       </tr>
     </tbody>
   </table>
@@ -486,6 +596,60 @@
         <td><span class="lic-oss license">Apache 2.0</span></td>
         <td>✅</td>
       </tr>
+      <tr>
+        <td>AWS X-Ray</td>
+        <td><span class="tag tag-t">T</span></td>
+        <td>X-Ray Console + Analytics</td>
+        <td>AWS Managed</td>
+        <td><span class="otlp-yes">✅ Via OTLP endpoint</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
+      <tr>
+        <td>Google Cloud Trace</td>
+        <td><span class="tag tag-t">T</span></td>
+        <td>Cloud Trace UI</td>
+        <td>GCP Managed</td>
+        <td><span class="otlp-yes">✅ Via OTLP</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
+      <tr>
+        <td>Azure Application Insights</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>Azure portal / App Insights UI</td>
+        <td>Azure Managed</td>
+        <td><span class="otlp-yes">✅ Via OTLP</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
+      <tr>
+        <td>Apache SkyWalking OAP</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>SkyWalking UI</td>
+        <td>ES / MySQL / TiDB / H2</td>
+        <td><span class="otlp-no">❌ SW8 protocol</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Elastic APM</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>Kibana APM UI</td>
+        <td>Elasticsearch</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-sav license">SSPL / Elastic</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Pinpoint</td>
+        <td><span class="tag tag-t">T</span></td>
+        <td>Pinpoint Web UI</td>
+        <td>HBase</td>
+        <td><span class="otlp-no">❌ Pinpoint protocol</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
     </tbody>
   </table>
 
@@ -557,6 +721,51 @@
         <td><span class="lic-oss license">Apache 2.0</span> / <span class="lic-com license">Commercial</span></td>
         <td>✅</td>
       </tr>
+      <tr>
+        <td>M3DB</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>M3Query (PromQL-compatible)</td>
+        <td>M3DB (distributed TSDB)</td>
+        <td><span class="otlp-partial">⚠️ Via remote_write</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Graphite <span style="font-size:10px;color:var(--muted);">(legacy)</span></td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>Graphite / Grafana</td>
+        <td>Whisper (local files)</td>
+        <td><span class="otlp-no">❌ Graphite protocol</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Amazon Managed Prometheus</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>PromQL</td>
+        <td>AWS Managed</td>
+        <td><span class="otlp-partial">⚠️ Via remote_write</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
+      <tr>
+        <td>Google Cloud Monitoring</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>MQL / PromQL</td>
+        <td>GCP Managed</td>
+        <td><span class="otlp-yes">✅ Via OTLP</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
+      <tr>
+        <td>Azure Monitor Metrics</td>
+        <td><span class="tag tag-m">M</span></td>
+        <td>KQL (Metrics Explorer)</td>
+        <td>Azure Managed</td>
+        <td><span class="otlp-yes">✅ Via OTLP</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
     </tbody>
   </table>
 
@@ -618,6 +827,60 @@
         <td><span class="otlp-yes">✅ Via HEC / OTEL</span></td>
         <td><span class="lic-com license">Commercial</span></td>
         <td>✅ Enterprise</td>
+      </tr>
+      <tr>
+        <td>Graylog</td>
+        <td><span class="tag tag-l">L</span></td>
+        <td>GELF / Graylog Search</td>
+        <td>Elasticsearch / MongoDB</td>
+        <td><span class="otlp-yes">✅ Yes (OTLP input)</span></td>
+        <td><span class="lic-sav license">SSPL / Commercial</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>AWS CloudWatch Logs</td>
+        <td><span class="tag tag-l">L</span></td>
+        <td>CloudWatch Insights</td>
+        <td>AWS Managed</td>
+        <td><span class="otlp-yes">✅ Via OTLP exporter</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
+      <tr>
+        <td>Google Cloud Logging</td>
+        <td><span class="tag tag-l">L</span></td>
+        <td>Cloud Logging query</td>
+        <td>GCP Managed</td>
+        <td><span class="otlp-yes">✅ Via OTLP exporter</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
+      <tr>
+        <td>Azure Monitor Logs</td>
+        <td><span class="tag tag-l">L</span></td>
+        <td>KQL (Log Analytics)</td>
+        <td>Azure Managed</td>
+        <td><span class="otlp-yes">✅ Via OTLP exporter</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+        <td>❌ Managed only</td>
+      </tr>
+      <tr>
+        <td>Seq</td>
+        <td><span class="tag tag-l">L</span></td>
+        <td>SQL-like (CLEF format)</td>
+        <td>SQLite / PostgreSQL</td>
+        <td><span class="otlp-yes">✅ Yes (OTLP ingest)</span></td>
+        <td><span class="lic-oss license">Free / Commercial</span></td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>OpenObserve</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>SQL</td>
+        <td>S3 / local disk</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+        <td>✅</td>
       </tr>
     </tbody>
   </table>
@@ -781,8 +1044,203 @@
         <td>Self-host free / cloud paid</td>
         <td><span class="lic-sav license">⚠️ BSL 1.1</span></td>
       </tr>
+      <tr>
+        <td>Instana</td>
+        <td class="vendor">IBM</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>Instana analytics</td>
+        <td>Host-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Chronosphere</td>
+        <td class="vendor">Chronosphere</td>
+        <td><span class="tag tag-m">M</span><span class="tag tag-t">T</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>PromQL / TraceQL</td>
+        <td>Resource-based (DPU)</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Better Stack</td>
+        <td class="vendor">Better Stack</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-m">M</span><span class="tag tag-t">T</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>SQL</td>
+        <td>Usage-based (free tier)</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>AWS CloudWatch</td>
+        <td class="vendor">Amazon</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes (OTLP ingest)</span></td>
+        <td>CW Insights / X-Ray Analytics</td>
+        <td>Pay-per-use</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Google Cloud Ops Suite</td>
+        <td class="vendor">Google</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>MQL / Cloud Logging query</td>
+        <td>Pay-per-use</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Azure Monitor</td>
+        <td class="vendor">Microsoft</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>KQL (Log Analytics)</td>
+        <td>Pay-per-use</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>Groundcover</td>
+        <td class="vendor">groundcover</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes (eBPF)</span></td>
+        <td>PromQL / LogQL</td>
+        <td>Host-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
+      <tr>
+        <td>OpenObserve</td>
+        <td class="vendor">OpenObserve</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>SQL</td>
+        <td>Usage-based (free self-host)</td>
+        <td><span class="lic-oss license">✅ Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td>Observe Inc.</td>
+        <td class="vendor">Observe</td>
+        <td><span class="tag tag-l">L</span><span class="tag tag-t">T</span><span class="tag tag-m">M</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td>OPAL</td>
+        <td>Usage-based</td>
+        <td><span class="lic-com license">❌ No</span></td>
+      </tr>
     </tbody>
   </table>
+</div>
+
+<!-- TABLE 4: eBPF -->
+<div class="section-label">Table 4 — eBPF &amp; Agent-less Observability</div>
+<div class="ref-table-wrap" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:40px;">
+  <div class="ref-table-header">
+    <div class="table-icon">⚡</div>
+    <div>
+      <h2>eBPF &amp; Agent-less Observability</h2>
+      <p>Tools that instrument at the Linux kernel level — <strong>no code changes required</strong>. Complement to SDK instrumentation, not a replacement.</p>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Tool</th>
+        <th>Vendor</th>
+        <th>Signals</th>
+        <th>How it works</th>
+        <th>K8s native</th>
+        <th>OTLP output</th>
+        <th>License</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Grafana Beyla</strong></td>
+        <td class="vendor">Grafana Labs</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span></td>
+        <td>eBPF probes on HTTP, gRPC, DB calls</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Pixie</strong></td>
+        <td class="vendor">New Relic / CNCF</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>eBPF in-cluster agents streaming to PEM</td>
+        <td><span class="otlp-yes">✅ K8s only</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Cilium Hubble</strong></td>
+        <td class="vendor">Isovalent / CNCF</td>
+        <td>Network flows, <span class="tag tag-t">T</span></td>
+        <td>eBPF network observability (requires Cilium CNI)</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Coroot</strong></td>
+        <td class="vendor">Coroot</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>eBPF service map + golden signals</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Groundcover</strong></td>
+        <td class="vendor">groundcover</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>eBPF full-stack — zero agent install, SaaS-managed</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-com license">Commercial</span></td>
+      </tr>
+      <tr>
+        <td><strong>Odigos</strong></td>
+        <td class="vendor">keyval</td>
+        <td><span class="tag tag-t">T</span><span class="tag tag-m">M</span><span class="tag tag-l">L</span></td>
+        <td>Auto-injects OTEL SDK or eBPF per service language</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Parca</strong></td>
+        <td class="vendor">Polar Signals / CNCF</td>
+        <td><span class="tag tag-p">Profiles</span></td>
+        <td>eBPF continuous CPU/memory profiling</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="otlp-partial">⚠️ Partial</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Tetragon</strong></td>
+        <td class="vendor">Isovalent / CNCF</td>
+        <td>Security events</td>
+        <td>Kernel-level eBPF for security + audit tracing</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="otlp-partial">⚠️ Partial</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Falco</strong></td>
+        <td class="vendor">CNCF</td>
+        <td>Security events, <span class="tag tag-l">L</span></td>
+        <td>eBPF/kernel module threat detection</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="padding:16px 24px;border-top:1px solid var(--border);background:var(--surface2);font-size:13px;color:#94a3b8;line-height:1.7;">
+    <strong style="color:var(--accent);">eBPF vs. SDK:</strong>
+    eBPF gives you entry/exit points at the network level but cannot add custom business spans or propagate trace context through Kafka or RabbitMQ.
+    Use eBPF tools (Beyla, Coroot) for <em>quick baseline visibility</em> on uninstrumented services, then migrate to OTEL SDK for deep observability.
+    The two approaches are complementary, not competing.
+  </div>
 </div>
 
 <!-- QUICK PICK -->
@@ -801,7 +1259,7 @@
         <td>SigNoz (all-in-one) — or — Grafana OSS stack (Tempo + Prometheus + Loki + Grafana)</td>
       </tr>
       <tr>
-        <td>Best trace query UX</td>
+        <td>Best trace investigation UX</td>
         <td>Honeycomb (BubbleUp), Tempo + TraceQL, or SigNoz</td>
       </tr>
       <tr>
@@ -817,15 +1275,130 @@
         <td>Grafana Cloud, Coralogix, or Axiom</td>
       </tr>
       <tr>
-        <td>High-cardinality trace debugging</td>
-        <td>Honeycomb</td>
+        <td>Already on AWS, minimal ops overhead</td>
+        <td>AWS CloudWatch + X-Ray (convenient; watch costs at scale)</td>
+      </tr>
+      <tr>
+        <td>Already on GCP</td>
+        <td>Google Cloud Ops Suite (Trace + Monitoring + Logging)</td>
+      </tr>
+      <tr>
+        <td>Already on Azure</td>
+        <td>Azure Monitor with KQL (Log Analytics)</td>
+      </tr>
+      <tr>
+        <td>Zero-code visibility for uninstrumented services</td>
+        <td>Grafana Beyla (web services) or Pixie (K8s interactive debugging)</td>
+      </tr>
+      <tr>
+        <td>Log-heavy workload, cost-sensitive</td>
+        <td>Loki (OSS, S3-backed) or Axiom (SaaS, generous free tier)</td>
+      </tr>
+      <tr>
+        <td>High-cardinality metrics at high scale</td>
+        <td>VictoriaMetrics (3–4× more efficient than Prometheus)</td>
+      </tr>
+      <tr>
+        <td>Java services — fastest instrumentation win</td>
+        <td>OTEL Java Agent (<code>-javaagent</code>) — zero code changes</td>
+      </tr>
+      <tr>
+        <td>Existing Fluent Bit on K8s nodes</td>
+        <td>Keep it; add OTLP output plugin → OTEL Collector</td>
+      </tr>
+      <tr>
+        <td>EFK (Fluentd) stack migration</td>
+        <td>Fluentd → OTEL Collector → Loki/SigNoz (incremental, no cutover)</td>
+      </tr>
+      <tr>
+        <td>Maximum cost reduction vs. Datadog in non-prod</td>
+        <td>SigNoz + OTEL Collector — 80–95% cost reduction</td>
       </tr>
       <tr>
         <td>Safe migration: vendor → OSS</td>
-        <td>OTEL Collector fan-out — run old and new backend simultaneously during cutover</td>
+        <td>OTEL Collector fan-out — run old and new backend simultaneously</td>
+      </tr>
+      <tr>
+        <td>Network-level K8s observability</td>
+        <td>Cilium + Hubble (eBPF, zero code, full service topology)</td>
+      </tr>
+      <tr>
+        <td>Continuous profiling (4th signal)</td>
+        <td>Pyroscope (SDK, language-native) or Parca (eBPF, zero-code)</td>
+      </tr>
+      <tr>
+        <td>Developer-friendly structured log search</td>
+        <td>Seq (SQL-like queries, runs locally, free tier)</td>
+      </tr>
+      <tr>
+        <td>Replace Elasticsearch complexity</td>
+        <td>Loki (simpler ops) or OpenObserve (SQL + S3, far cheaper)</td>
       </tr>
     </tbody>
   </table>
+</div>
+
+<!-- INFORMED OPINIONS -->
+<div class="section-label">Informed Opinions</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:40px;">
+  <div class="ref-table-header">
+    <div class="table-icon">💡</div>
+    <div>
+      <h2>Informed Opinions</h2>
+      <p>Direct technical assessments — not marketing. Use these to cut through the noise.</p>
+    </div>
+  </div>
+
+  <div style="padding:0 24px 24px;">
+    <h3 style="color:var(--accent);font-size:15px;margin:24px 0 10px;font-family:var(--mono);">Instrumentation SDKs &amp; Agents</h3>
+    <ul style="color:#94a3b8;font-size:13px;line-height:1.8;padding-left:20px;">
+      <li><strong style="color:#e2e8f0;">Use OTEL SDK for all new code.</strong> It is the only choice that keeps your backend options open. All other SDKs produce vendor-specific formats.</li>
+      <li><strong style="color:#ef4444;">AWS X-Ray SDK is a trap.</strong> Proprietary wire format, no OTLP output. Use OTEL SDK and configure the OTEL Collector <code>awsxray</code> exporter if you need X-Ray.</li>
+      <li><strong style="color:#e2e8f0;">Dynatrace OneAgent and Instana Agent</strong> are good for zero-code coverage of large inherited codebases when vendor lock-in is acceptable. For greenfield, OTEL SDK is better.</li>
+      <li><strong style="color:#e2e8f0;">Grafana Beyla</strong> is the most practical way to get traces from uninstrumented services without a dev cycle. Use as a bridge while migrating to SDK instrumentation.</li>
+      <li><strong style="color:#e2e8f0;">Telegraf</strong> is underrated for infrastructure metrics — 300+ input plugins cover things the OTEL Collector cannot. Run both: Telegraf → OTEL Collector → backend.</li>
+    </ul>
+
+    <h3 style="color:var(--accent);font-size:15px;margin:24px 0 10px;font-family:var(--mono);">Log Shippers</h3>
+    <ul style="color:#94a3b8;font-size:13px;line-height:1.8;padding-left:20px;">
+      <li><strong style="color:#3ecf8e;">Fluent Bit is the clear winner</strong> in K8s: smallest footprint (~10 MB), fastest processing, pre-installed on EKS/GKE/AKS. Default choice for any new K8s deployment.</li>
+      <li><strong style="color:#e2e8f0;">Logstash is being retired</strong> in most modern stacks. The OTEL Collector's <code>transform</code> and <code>filter</code> processors cover most of its functionality at far lower overhead.</li>
+      <li><strong style="color:#e2e8f0;">Promtail locks you to Loki.</strong> Grafana Alloy is its more capable successor and supports multiple backends. For multi-backend routing, use Fluent Bit + OTEL Collector.</li>
+      <li><strong style="color:#e2e8f0;">Elastic Beats family</strong> (Filebeat, Metricbeat) is only worth the overhead if you're already deep in Elastic. Otherwise, Fluent Bit + OTEL Collector is more flexible.</li>
+      <li><strong style="color:#e2e8f0;">Grafana Alloy</strong> is worth evaluating for a fresh Grafana-based stack — it consolidates Promtail, Telegraf, and OTEL collection into one binary.</li>
+    </ul>
+
+    <h3 style="color:var(--accent);font-size:15px;margin:24px 0 10px;font-family:var(--mono);">Backends &amp; Storage</h3>
+    <ul style="color:#94a3b8;font-size:13px;line-height:1.8;padding-left:20px;">
+      <li><strong style="color:#e2e8f0;">Prometheus is the standard for metrics.</strong> Start here. Add Thanos or Grafana Mimir for multi-region HA. VictoriaMetrics is 3–4× more efficient at ingestion.</li>
+      <li><strong style="color:#e2e8f0;">Loki is cost-effective</strong> (object storage, no index) but LogQL has a steeper learning curve than SQL/KQL. Best when Grafana is already your dashboarding layer.</li>
+      <li><strong style="color:#3ecf8e;">ClickHouse is the best query engine</strong> for logs and traces at scale. SigNoz and Uptrace both use it — which explains their query speed advantage over Elasticsearch-backed alternatives.</li>
+      <li><strong style="color:#e2e8f0;">Jaeger is solid for dev/test</strong> but Grafana Tempo (pure object storage, no index) is cheaper to operate in production. Prefer Tempo for new deployments.</li>
+      <li><strong style="color:#e2e8f0;">Elasticsearch is powerful but expensive to run.</strong> OpenSearch is a drop-in OSS alternative. Both are being displaced by ClickHouse-backed tools in modern stacks.</li>
+      <li><strong style="color:#ef4444;">Graphite is end-of-life.</strong> Use the Graphite exporter for Prometheus as a migration bridge. No new projects should use it.</li>
+      <li><strong style="color:#ef4444;">OpenTSDB has a heavyweight HBase dependency</strong> — migrate to VictoriaMetrics or Prometheus.</li>
+      <li><strong style="color:#e2e8f0;">OpenObserve</strong> (Apache 2.0) is impressive: S3-backed, OTLP-native, SQL queries, claims 100× cheaper per GB than Datadog. Worth evaluating for log-heavy workloads.</li>
+    </ul>
+
+    <h3 style="color:var(--accent);font-size:15px;margin:24px 0 10px;font-family:var(--mono);">Platforms</h3>
+    <ul style="color:#94a3b8;font-size:13px;line-height:1.8;padding-left:20px;">
+      <li><strong style="color:#e2e8f0;">Datadog is the most complete platform</strong> but pricing surprises teams — host + container + custom metrics + log ingestion add up fast. Audit your bill before committing.</li>
+      <li><strong style="color:#3ecf8e;">Honeycomb has the best trace investigation UX</strong> for high-cardinality data. BubbleUp makes root-cause analysis genuinely faster. Worth the premium if traces are your primary debug tool.</li>
+      <li><strong style="color:#3ecf8e;">SigNoz is the best fully open-source Datadog alternative.</strong> OTLP-native, ClickHouse-backed, active development, good UI. Top recommendation for non-production environments.</li>
+      <li><strong style="color:#e2e8f0;">Chronosphere</strong> was built for Kubernetes at Uber scale. Evaluate it if you're running large K8s clusters and struggling with Prometheus cardinality explosion.</li>
+      <li><strong style="color:#f59e0b;">AWS CloudWatch costs spiral quickly.</strong> Custom metric charges, log ingestion fees, and alarm charges compound. At scale, use Prometheus for metrics and selectively route to CloudWatch for alerting.</li>
+      <li><strong style="color:#e2e8f0;">Dynatrace and AppDynamics</strong> are enterprise APM incumbents with deep auto-discovery. Both support OTLP ingest, so OTEL SDK can coexist. Migration path exists but is not trivial.</li>
+      <li><strong style="color:#ef4444;">Avoid rebuilding ELK</strong> (Elasticsearch + Logstash + Kibana) for new deployments — high operational complexity and cost. Use Loki + Grafana or SigNoz instead.</li>
+    </ul>
+
+    <h3 style="color:var(--accent);font-size:15px;margin:24px 0 10px;font-family:var(--mono);">eBPF Tools</h3>
+    <ul style="color:#94a3b8;font-size:13px;line-height:1.8;padding-left:20px;">
+      <li><strong style="color:#e2e8f0;">eBPF tools complement, not replace, SDK instrumentation.</strong> They cannot add custom business spans or propagate trace context through Kafka or RabbitMQ.</li>
+      <li><strong style="color:#e2e8f0;">Beyla or Coroot</strong> are the fastest path to "some visibility" for uninstrumented services. Then replace with OTEL SDK where deep observability matters.</li>
+      <li><strong style="color:#e2e8f0;">Cilium Hubble</strong> is for network-level observability (service-to-service topology, L4/L7 flows) — not APM. Excellent complement to trace-level tooling.</li>
+      <li><strong style="color:#e2e8f0;">Odigos</strong> is uniquely useful for polyglot teams: it automatically selects and injects the right OTEL SDK or eBPF agent per service, removing per-team instrumentation burden.</li>
+    </ul>
+  </div>
 </div>
 
 
