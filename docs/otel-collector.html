@@ -411,7 +411,55 @@
       </div>
     </div>
     <div class="stage-arrow">→</div>
-    <!-- PROCESSORS -->
+  </div>
+
+  <!-- Log Shippers callout -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:0 8px 8px 0;padding:20px 24px;margin:24px 0;">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Alternative to filelog — Log Shippers</div>
+    <p style="font-size:13px;color:#94a3b8;margin-bottom:16px;">
+      In many Kubernetes clusters, <strong style="color:var(--text);">Fluent Bit</strong> is already running as a DaemonSet (EKS, GKE, and AKS ship with it).
+      Rather than replacing it with the <code>filelog</code> receiver, add an OTLP output plugin and route into the Collector.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:8px;">Fluent Bit — OTLP output plugin</div>
+        <pre style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:14px;font-size:11.5px;line-height:1.6;overflow-x:auto;margin:0;"><span style="color:#3ecf8e;">[OUTPUT]</span>
+    <span style="color:#4f9cf9;">Name</span>         opentelemetry
+    <span style="color:#4f9cf9;">Match</span>        *
+    <span style="color:#4f9cf9;">Host</span>         otel-collector.monitoring
+    <span style="color:#4f9cf9;">Port</span>         4318
+    <span style="color:#4f9cf9;">logs_uri</span>     /v1/logs
+    <span style="color:#4f9cf9;">tls</span>          off</pre>
+      </div>
+      <div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:8px;">Fluentd — fluent-plugin-opentelemetry</div>
+        <pre style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:14px;font-size:11.5px;line-height:1.6;overflow-x:auto;margin:0;"><span style="color:#a78bfa;">&lt;match **&gt;</span>
+  <span style="color:#4f9cf9;">@type</span>     opentelemetry
+  <span style="color:#4f9cf9;">endpoint</span>  http://otel-collector:4318
+  <span style="color:#a78bfa;">&lt;buffer&gt;</span>
+    <span style="color:#4f9cf9;">flush_interval</span>  5s
+  <span style="color:#a78bfa;">&lt;/buffer&gt;</span>
+<span style="color:#a78bfa;">&lt;/match&gt;</span></pre>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr>
+          <th style="padding:7px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);">Situation</th>
+          <th style="padding:7px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);">Recommendation</th>
+        </tr></thead>
+        <tbody>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:#94a3b8;">K8s cluster with Fluent Bit already deployed</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);">Keep Fluent Bit; add OTLP output → Collector</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:#94a3b8;">Migrating from EFK (Fluentd) stack</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);">Route Fluentd → Collector → new backend</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:#94a3b8;">No existing log shipper</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);">Use OTEL Collector <code>filelog</code> receiver directly</td></tr>
+          <tr><td style="padding:8px 12px;color:#94a3b8;">Very low per-node memory requirement</td><td style="padding:8px 12px;color:var(--text);">Fluent Bit DaemonSet + central Collector gateway</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PROCESSORS -->
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
     <div class="stage proc">
       <div class="stage-header proc">② Processors</div>
       <div class="stage-body proc">

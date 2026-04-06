@@ -42,7 +42,48 @@ Receivers accept incoming telemetry. The most common are:
 | `filelog` | Tails log files from disk |
 | `k8s_events` | Receives Kubernetes cluster events |
 
-### Stage 2 — Processors
+### Log Shippers as an Alternative to the filelog Receiver
+
+The OTEL Collector's `filelog` receiver can collect logs directly from disk, but in many
+environments — especially Kubernetes — a dedicated log shipper is already running. Rather
+than replacing it, wire its output into the Collector.
+
+**Fluent Bit** (most common — pre-installed on EKS, GKE, AKS):
+```yaml
+# fluent-bit ConfigMap — forward logs to OTEL Collector via OTLP
+[OUTPUT]
+    Name        opentelemetry
+    Match       *
+    Host        otel-collector.monitoring.svc.cluster.local
+    Port        4318
+    metrics_uri /v1/metrics
+    logs_uri    /v1/logs
+    traces_uri  /v1/traces
+    Log_response_payload True
+    tls         off
+```
+
+**Fluentd** (EFK stack migration path — use `fluent-plugin-opentelemetry`):
+```ruby
+# fluent.conf — send to OTEL Collector
+<match **>
+  @type opentelemetry
+  endpoint http://otel-collector:4318
+  <buffer>
+    @type file
+    flush_interval 5s
+  </buffer>
+</match>
+```
+
+**When to use each:**
+
+| Situation | Recommendation |
+|-----------|---------------|
+| Kubernetes cluster with Fluent Bit already deployed | Keep Fluent Bit; add OTLP output → Collector |
+| Migrating from an EFK (Elasticsearch + Fluentd + Kibana) stack | Route Fluentd → Collector → new backend |
+| No existing log shipper | Use OTEL Collector `filelog` receiver directly |
+| Need very low per-node memory footprint | Fluent Bit DaemonSet + central Collector gateway |
 
 Processors transform or filter data in-flight. **Order matters** — processors run sequentially in the order listed.
 
