@@ -39,7 +39,47 @@ Tools that run inside (or alongside) your application to produce telemetry.
 
 ---
 
-## Table 2 — Backends & Storage Systems
+## Table 1b — Log Shippers & Forwarders
+
+Tools dedicated to collecting and forwarding log data. These sit **before** or **alongside**
+the OTEL Collector in your pipeline and are often already present in Kubernetes clusters.
+
+| Tool | Vendor | Primary role | OTLP output | Footprint | K8s default | License |
+|------|--------|-------------|-------------|-----------|-------------|---------|
+| **Fluent Bit** | CNCF / Fluent | Lightweight log collector & forwarder | ✅ Yes (OTLP output plugin) | ~1 MB binary, ~10 MB RAM | ✅ Pre-installed on EKS, GKE, AKS | Apache 2.0 |
+| **Fluentd** | CNCF / Fluent | Log aggregator & router (EFK stack) | ✅ Yes (`fluent-plugin-opentelemetry`) | ~40 MB, Ruby-based | ⚠️ Common but being replaced by Fluent Bit | Apache 2.0 |
+| **Logstash** | Elastic | Log processing pipeline (ELK stack) | ✅ Yes (OpenTelemetry output plugin) | ~500 MB JVM | ❌ No | Elastic License / SSPL |
+| **Vector** | Datadog (OSS) | High-performance log / metrics router | ✅ Yes (OTLP sink) | ~30 MB Rust binary | ❌ No | MPL 2.0 |
+| **OTEL Collector** | CNCF / Community | Unified traces + metrics + logs pipeline | ✅ Native (OTLP) | ~50–100 MB | ❌ Needs Operator | Apache 2.0 |
+
+**When to use which:**
+
+| Scenario | Best choice |
+|----------|------------|
+| Already have Fluent Bit on K8s nodes | Keep it; add OTLP output → OTEL Collector |
+| Need lightweight log collection at the edge / IoT | Fluent Bit |
+| Running the EFK stack today, migrating incrementally | Fluentd → OTEL Collector bridge |
+| Want a single tool for all three signals | OTEL Collector (filelog receiver) |
+| High-throughput log routing with complex transforms | Vector or Fluent Bit |
+
+**Fluent Bit → OTEL Collector hybrid pattern** (common in Kubernetes):
+```
+[Pod logs]
+    │
+    ▼ collected per-node
+[Fluent Bit DaemonSet]   ← very low overhead, already present
+    │ OTLP / forward protocol
+    ▼
+[OTEL Collector gateway] ← handles sampling, enrichment, fan-out
+    │                │
+    ▼                ▼
+[Datadog]        [SigNoz / Loki]
+```
+
+This is the recommended pattern when your cluster already has Fluent Bit: don't replace it,
+route its output into the OTEL Collector and let the Collector handle backend routing.
+
+---
 
 Systems that store and query telemetry data. These are the destination for Collector exporters.
 

@@ -320,6 +320,93 @@
   </table>
 </div>
 
+<!-- TABLE 1b: LOG SHIPPERS -->
+<div class="section-label">Table 1b — Log Shippers &amp; Forwarders</div>
+<div class="ref-table-wrap" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:40px;">
+  <div class="ref-table-header">
+    <div class="table-icon">⇉</div>
+    <div>
+      <h2>Log Shippers &amp; Forwarders</h2>
+      <p>Tools dedicated to collecting and routing log data — often deployed <em>before</em> the OTEL Collector, or in place of the <code>filelog</code> receiver</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tool</th>
+        <th>Primary Role</th>
+        <th>OTLP Output</th>
+        <th>Footprint</th>
+        <th>K8s Default</th>
+        <th>License</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Fluent Bit</strong></td>
+        <td>Lightweight log collector &amp; forwarder</td>
+        <td><span class="otlp-yes">✅ Yes</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~1 MB binary / ~10 MB RAM</td>
+        <td><span style="color:var(--green);font-size:13px;">✅ Pre-installed (EKS, GKE, AKS)</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Fluentd</strong></td>
+        <td>Log aggregator &amp; router (EFK stack)</td>
+        <td><span class="otlp-yes">✅ Yes</span> <span style="font-size:11px;color:var(--muted);">(plugin)</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~40 MB (Ruby runtime)</td>
+        <td><span style="color:var(--orange);font-size:13px;">⚠️ Common, being replaced by Fluent Bit</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Logstash</strong></td>
+        <td>Log processing pipeline (ELK stack)</td>
+        <td><span class="otlp-yes">✅ Yes</span> <span style="font-size:11px;color:var(--muted);">(output plugin)</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~500 MB (JVM)</td>
+        <td><span style="color:var(--muted);font-size:13px;">❌ No</span></td>
+        <td><span class="lic-com license">Elastic License</span></td>
+      </tr>
+      <tr>
+        <td><strong>Vector</strong></td>
+        <td>High-performance log &amp; metrics router</td>
+        <td><span class="otlp-yes">✅ Yes</span> <span style="font-size:11px;color:var(--muted);">(OTLP sink)</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~30 MB (Rust)</td>
+        <td><span style="color:var(--muted);font-size:13px;">❌ No</span></td>
+        <td><span class="lic-oss license">MPL 2.0</span></td>
+      </tr>
+      <tr>
+        <td><strong>OTEL Collector</strong></td>
+        <td>Unified traces + metrics + logs pipeline</td>
+        <td><span class="otlp-yes">✅ Native</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">~50–100 MB</td>
+        <td><span style="color:var(--muted);font-size:13px;">⚠️ Needs Operator</span></td>
+        <td><span class="lic-oss license">Apache 2.0</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="padding:20px 24px;border-top:1px solid var(--border);background:var(--surface2);">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em;">Fluent Bit → OTEL Collector hybrid pattern (common in Kubernetes)</div>
+    <pre style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:16px;font-size:12px;line-height:1.7;overflow-x:auto;"><span style="color:#475569;">┌─────────────┐</span>     <span style="color:#475569;">per node DaemonSet</span>
+<span style="color:#475569;">│  Pod logs   │</span>
+<span style="color:#475569;">└──────┬──────┘</span>
+       <span style="color:#475569;">│ collected by</span>
+       ▼
+<span style="color:var(--green);">[ Fluent Bit ]</span>  <span style="color:#475569;">← ~10 MB RAM, already present in most clusters</span>
+       <span style="color:#475569;">│ OTLP output</span>
+       ▼
+<span style="color:var(--accent);">[ OTEL Collector gateway ]</span>  <span style="color:#475569;">← sampling, enrichment, fan-out</span>
+       <span style="color:#475569;">│              │</span>
+       ▼              ▼
+<span style="color:#818cf8;">[ Datadog ]</span>    <span style="color:var(--green);">[ SigNoz / Loki ]</span></pre>
+    <p style="font-size:12px;color:#94a3b8;margin-top:12px;">
+      If your cluster already has Fluent Bit running, don't replace it — add an OTLP output plugin
+      and point it at an OTEL Collector. The Collector handles routing, sampling, and backend fan-out.
+    </p>
+  </div>
+</div>
+
 <!-- TABLE 2: BACKENDS -->
 <div class="section-label">Table 2 — Backends &amp; Storage Systems</div>
 <div class="ref-table-wrap backends">
